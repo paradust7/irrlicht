@@ -598,12 +598,14 @@ void* CEGLManager::getProcAddress(const std::string &procName)
 {
 	void* proc = NULL;
 	proc = (void*)eglGetProcAddress(procName.c_str());
+/*
 	if (!proc) { // fallback
 		if (!libHandle)
 			libHandle = dlopen("libGLESv2.so", RTLD_LAZY);
 		if (libHandle)
 			proc = dlsym(libHandle, procName.c_str());
 	}
+*/
 	return proc;
 }
 

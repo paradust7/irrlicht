@@ -2,10 +2,11 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
+#include <iostream>
+
 #include "IrrCompileConfig.h"
 
 #ifdef _IRR_COMPILE_WITH_SDL_DEVICE_
-
 #include "CIrrDeviceSDL.h"
 #include "IEventReceiver.h"
 #include "irrList.h"
@@ -25,6 +26,35 @@
 #endif
 #include <emscripten.h>
 #endif
+
+extern "C" {
+	EMSCRIPTEN_KEEPALIVE
+	EM_BOOL irrlicht_want_pointerlock(void);
+
+	EMSCRIPTEN_KEEPALIVE
+	void irrlicht_resize(int width, int height);
+
+	void mainloop_reenter_blessed(void);
+}
+
+static bool want_pointerlock = false;
+static int canvas_width = 0;
+static int canvas_height = 0;
+static bool canvas_updated = false;
+
+EM_BOOL irrlicht_want_pointerlock(void) {
+	return want_pointerlock ? 1 : 0;
+}
+
+void irrlicht_resize(int width, int height) {
+	if (canvas_width != width || canvas_height != height) {
+		canvas_width = width;
+		canvas_height = height;
+		canvas_updated = true;
+	}
+}
+
+
 
 static int SDLDeviceInstances = 0;
 
@@ -176,6 +206,25 @@ bool CIrrDeviceSDL::isNoUnicodeKey(EKEY_CODE key) const
 	}
 }
 
+#ifdef __EMSCRIPTEN__
+static int SDLCALL mainloop_event_filter(void *userdata, SDL_Event * event) {
+	switch (event->type) {
+	case SDL_MOUSEBUTTONDOWN:
+	case SDL_MOUSEBUTTONUP:
+	case SDL_KEYDOWN:
+	case SDL_KEYUP:
+		// Push the event manually and re-enter the main loop so that it is processed immediately.
+		if (SDL_PeepEvents(event, 1, SDL_ADDEVENT, 0, 0) <= 0) {
+			return -1;
+		}
+		mainloop_reenter_blessed();
+		return 0;
+	}
+	// Handle all other events normally.
+	return 1;
+}
+#endif
+
 //! constructor
 CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 	: CIrrDeviceStub(param),
@@ -205,6 +254,13 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 		{
 			os::Printer::log("SDL initialized", ELL_INFORMATION);
 		}
+
+#ifdef __EMSCRIPTEN__
+		// Hook into MainLoop so that SDL events (keyboard/mouse)
+		// trigger re-entry for immediate processing.
+		SDL_SetEventFilter(mainloop_event_filter, NULL);
+#endif
+
 	}
 
 	// create keymap
@@ -249,7 +305,7 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 	}
 
 	// create cursor control
-	CursorControl = new CCursorControl(this);
+	CursorControl = new CCursorControl(this, &want_pointerlock);
 
 	// create driver
 	createDriver();
@@ -310,17 +366,58 @@ void CIrrDeviceSDL::logAttributes()
 	os::Printer::log(sdl_attr.c_str());
 }
 
+#ifdef __EMSCRIPTEN__
+// The default SDL_CreateWindowAndRenderer does not allow setting
+// renderer flags. The VSYNC flag is needed to not break
+// requestAnimationFrame for the main loop on Emscripten.
+static int
+SDL_CreateWindowAndRendererFixed(int width, int height, Uint32 window_flags,
+                                 SDL_Window **window, SDL_Renderer **renderer)
+{
+    *window = SDL_CreateWindow(NULL, SDL_WINDOWPOS_UNDEFINED,
+                                     SDL_WINDOWPOS_UNDEFINED,
+                                     width, height, window_flags);
+    if (!*window) {
+        *renderer = NULL;
+        return -1;
+    }
+
+    // TODO(paradust):
+    //
+    // SDL_RENDERER_PRESENTVSYNC is equivalent to:
+    //
+    //   emscripten_set_main_loop_timing(1, 1);  // use requestAnimationFrame instead of setTimeout
+    //
+    // which is the recommended setting for rendering performance.
+    //
+    // However, major performance issues occur in other threads (especially the server thread)
+    // when this is enabled. It appears something is being done in other threads that
+    // requires periodic messaging to the main thread. If the main thread is too busy, other
+    // threads stall. This dependency should be found and removed, so that vsync can
+    // be enabled.
+    //
+    *renderer = SDL_CreateRenderer(*window, -1, 0); //SDL_RENDERER_PRESENTVSYNC);
+    if (!*renderer) {
+        return -1;
+    }
+
+    return 0;
+}
+#endif
+
 bool CIrrDeviceSDL::createWindow()
 {
 #ifdef _IRR_EMSCRIPTEN_PLATFORM_
-	if ( Width != 0 || Height != 0 )
+	if ( Width != 0 || Height != 0 ) {
+		printf("SETTING CANVAS SIZE: WIDTH=%d, HEIGHT=%d\n", Width, Height);
 		emscripten_set_canvas_size( Width, Height);
-	else
+	} else
 	{
 		int w, h, fs;
 		emscripten_get_canvas_size(&w, &h, &fs);
 		Width = w;
 		Height = h;
+		printf("GOT FROM EMSCRIPTEN: WIDTH=%d, HEIGHT=%d\n", Width, Height);
 	}
 
 	SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 8 );
@@ -343,7 +440,7 @@ bool CIrrDeviceSDL::createWindow()
 		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
 	}	
 
-	SDL_CreateWindowAndRenderer(0, 0, SDL_Flags, &Window, &Renderer); // 0,0 will use the canvas size
+	SDL_CreateWindowAndRendererFixed(Width, Height, SDL_Flags, &Window, &Renderer); // 0,0 will use the canvas size
 
 	logAttributes();
 
@@ -510,7 +607,7 @@ void CIrrDeviceSDL::createDriver()
 	if ( VideoDriver && CreationParams.WindowSize.Width == 0 && CreationParams.WindowSize.Height == 0 && Width > 0 && Height > 0 )
 	{
 #ifdef _IRR_EMSCRIPTEN_PLATFORM_
-		SDL_CreateWindowAndRenderer(Width, Height, SDL_Flags, &Window, &Renderer);
+		SDL_CreateWindowAndRendererFixed(Width, Height, SDL_Flags, &Window, &Renderer);
 #else //_IRR_EMSCRIPTEN_PLATFORM_
 		Window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_Flags);
 #endif //_IRR_EMSCRIPTEN_PLATFOR
@@ -527,9 +624,20 @@ bool CIrrDeviceSDL::run()
 	SEvent irrevent;
 	SDL_Event SDL_event;
 
+	// TODO(paradust):
+	//
+	// SDL/emscripten doesn't generate SDL_WINDOWEVENT_RESIZED or SDL_WINDOWEVENT_SIZE_CHANGED
+	// events when the canvas is resized externally (using the js api). It isn't clear why.
+	// This would match the behavior of other platforms. Until fixed, trigger the update manually.
+	if (canvas_updated && (Width != canvas_width || Height != canvas_height)) {
+		SDL_SetWindowSize(Window, canvas_width, canvas_height);
+		canvas_updated = false;
+	}
+
 	while ( !Close && SDL_PollEvent( &SDL_event ) )
 	{
 		// os::Printer::log("event: ", core::stringc((int)SDL_event.type).c_str(),   ELL_INFORMATION);	// just for debugging
+		//std::cout << "SDL_PollEvent: " << SDL_event.type << std::endl;
 
 		switch ( SDL_event.type )
 		{
@@ -538,8 +646,8 @@ bool CIrrDeviceSDL::run()
 			irrevent.MouseInput.Event = irr::EMIE_MOUSE_MOVED;
 			MouseX = irrevent.MouseInput.X = SDL_event.motion.x;
 			MouseY = irrevent.MouseInput.Y = SDL_event.motion.y;
-			MouseXRel = SDL_event.motion.xrel;
-			MouseYRel = SDL_event.motion.yrel;
+			MouseXRel = irrevent.MouseInput.XRel = SDL_event.motion.xrel;
+			MouseYRel = irrevent.MouseInput.YRel = SDL_event.motion.yrel;
 			irrevent.MouseInput.ButtonStates = MouseButtonStates;
 
 			postEventFromUser(irrevent);
@@ -558,6 +666,7 @@ bool CIrrDeviceSDL::run()
 
 			irrevent.MouseInput.Event = irr::EMIE_MOUSE_MOVED;
 
+			/* // Handled by javascript instead.
 
 #ifdef _IRR_EMSCRIPTEN_PLATFORM_
 			// Handle mouselocking in emscripten in Windowed mode.
@@ -584,6 +693,7 @@ bool CIrrDeviceSDL::run()
 				}
 			}
 #endif
+			*/
 
 			switch(SDL_event.button.button)
 			{
@@ -653,14 +763,15 @@ bool CIrrDeviceSDL::run()
 		case SDL_KEYDOWN:
 		case SDL_KEYUP:
 			{
+				SDL_Keycode kc = SDL_event.key.keysym.sym;
+				bool isAscii = (kc >= ' ' && kc <= '~');
 				SKeyMap mp;
 				mp.SDLKey = SDL_event.key.keysym.sym;
 				s32 idx = KeyMap.binary_search(mp);
 
-				EKEY_CODE key;
-				if (idx == -1)
-					key = (EKEY_CODE)0;
-				else
+				// For ascii, `Key` is always the upper-case version, Char is the original
+				EKEY_CODE key = isAscii ? (EKEY_CODE)irr::core::locale_upper(kc) : (EKEY_CODE)0;
+				if (!isAscii && idx != -1)
 					key = (EKEY_CODE)KeyMap[idx].Win32Key;
 
 #ifdef _IRR_WINDOWS_API_
@@ -673,7 +784,7 @@ bool CIrrDeviceSDL::run()
 #endif
 				irrevent.EventType = irr::EET_KEY_INPUT_EVENT;
 
-				if (isNoUnicodeKey(key))
+				if (!isAscii && isNoUnicodeKey(key))
 					irrevent.KeyInput.Char = 0;
 				else
 					irrevent.KeyInput.Char = SDL_event.key.keysym.sym;
@@ -690,7 +801,6 @@ bool CIrrDeviceSDL::run()
 
 				if (convertCharToUppercase)
 					irrevent.KeyInput.Char = irr::core::locale_upper(irrevent.KeyInput.Char);
-
 				postEventFromUser(irrevent);
 			}
 			break;
@@ -708,7 +818,9 @@ bool CIrrDeviceSDL::run()
 			case SDL_WINDOWEVENT_RESTORED:
 				WindowMinimized = false;
 				break;
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
 			case SDL_WINDOWEVENT_RESIZED:
+				std::cout << "RESIZE: w=" << SDL_event.window.data1 << ", h=" << SDL_event.window.data2 << std::endl;
 				if ((SDL_event.window.data1 != (int)Width) || (SDL_event.window.data2 != (int)Height))
 				{
 					Width = SDL_event.window.data1;
@@ -718,7 +830,7 @@ bool CIrrDeviceSDL::run()
 				}
 				break;
 			}
-
+			break;
 		case SDL_USEREVENT:
 			irrevent.EventType = irr::EET_USER_EVENT;
 			irrevent.UserEvent.UserData1 = reinterpret_cast<uintptr_t>(SDL_event.user.data1);

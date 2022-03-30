@@ -98,7 +98,7 @@ elseif(APPLE)
 	add_definitions(-DGL_SILENCE_DEPRECATION)
 else()
 	# Unix probably
-	find_package(X11 REQUIRED)
+	#find_package(X11 REQUIRED)
 endif()
 
 set(link_includes
@@ -115,7 +115,6 @@ set(link_includes
 	${EGL_INCLUDE_DIR}
 
 	"$<$<PLATFORM_ID:Android>:${ANDROID_NDK}/sources/android/native_app_glue>"
-	${X11_INCLUDE_DIR}
 )
 
 set(link_libs
@@ -135,7 +134,6 @@ set(link_libs
 	${IOKIT_LIB}
 	"$<$<PLATFORM_ID:Windows>:gdi32>"
 	"$<$<PLATFORM_ID:Windows>:winmm>"
-	${X11_X11_LIB}
 	${X11_Xxf86vm_LIB}
 )
 
