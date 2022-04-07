@@ -100,6 +100,7 @@ EM_BOOL CIrrDeviceSDL::MouseEnterCallback(int eventType, const EmscriptenMouseEv
 	CIrrDeviceSDL * This = static_cast<CIrrDeviceSDL*>(userData);
 
 	SEvent irrevent;
+	memset(&irrevent, 0, sizeof(SEvent));
 
 	irrevent.EventType = irr::EET_MOUSE_INPUT_EVENT;
 	irrevent.MouseInput.Event = irr::EMIE_MOUSE_ENTER_CANVAS;
@@ -121,6 +122,7 @@ EM_BOOL CIrrDeviceSDL::MouseLeaveCallback(int eventType, const EmscriptenMouseEv
 	CIrrDeviceSDL * This = static_cast<CIrrDeviceSDL*>(userData);
 
 	SEvent irrevent;
+	memset(&irrevent, 0, sizeof(SEvent));
 
 	irrevent.EventType = irr::EET_MOUSE_INPUT_EVENT;
 	irrevent.MouseInput.Event = irr::EMIE_MOUSE_LEAVE_CANVAS;
@@ -615,6 +617,16 @@ void CIrrDeviceSDL::createDriver()
 	}
 }
 
+static bool GetShiftState() {
+    const Uint8 *state = SDL_GetKeyboardState(0);
+    return state[SDL_SCANCODE_LSHIFT] || state[SDL_SCANCODE_RSHIFT];
+}
+
+static bool GetCtrlState() {
+    const Uint8 *state = SDL_GetKeyboardState(0);
+    return state[SDL_SCANCODE_LCTRL] || state[SDL_SCANCODE_RCTRL];
+}
+
 
 //! runs the device. Returns false if device wants to be deleted
 bool CIrrDeviceSDL::run()
@@ -622,6 +634,8 @@ bool CIrrDeviceSDL::run()
 	os::Timer::tick();
 
 	SEvent irrevent;
+	memset(&irrevent, 0, sizeof(SEvent));
+
 	SDL_Event SDL_event;
 
 	// TODO(paradust):
@@ -649,6 +663,8 @@ bool CIrrDeviceSDL::run()
 			MouseXRel = irrevent.MouseInput.XRel = SDL_event.motion.xrel;
 			MouseYRel = irrevent.MouseInput.YRel = SDL_event.motion.yrel;
 			irrevent.MouseInput.ButtonStates = MouseButtonStates;
+			irrevent.MouseInput.Shift = GetShiftState();
+			irrevent.MouseInput.Control = GetCtrlState();
 
 			postEventFromUser(irrevent);
 			break;
@@ -663,6 +679,8 @@ bool CIrrDeviceSDL::run()
 			irrevent.EventType = irr::EET_MOUSE_INPUT_EVENT;
 			irrevent.MouseInput.X = SDL_event.button.x;
 			irrevent.MouseInput.Y = SDL_event.button.y;
+			irrevent.MouseInput.Shift = GetShiftState();
+			irrevent.MouseInput.Control = GetCtrlState();
 
 			irrevent.MouseInput.Event = irr::EMIE_MOUSE_MOVED;
 
@@ -853,6 +871,7 @@ bool CIrrDeviceSDL::run()
 	SDL_JoystickUpdate();
 	// we'll always send joystick input events...
 	SEvent joyevent;
+	memset(&joyevent, 0, sizeof(SEvent));
 	joyevent.EventType = EET_JOYSTICK_INPUT_EVENT;
 	for (u32 i=0; i<Joysticks.size(); ++i)
 	{
