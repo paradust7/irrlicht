@@ -34,7 +34,7 @@ extern "C" {
 	EMSCRIPTEN_KEEPALIVE
 	void irrlicht_resize(int width, int height);
 
-	void mainloop_reenter_blessed(void);
+	void emloop_reenter_blessed(void);
 }
 
 static bool want_pointerlock = false;
@@ -209,7 +209,7 @@ bool CIrrDeviceSDL::isNoUnicodeKey(EKEY_CODE key) const
 }
 
 #ifdef __EMSCRIPTEN__
-static int SDLCALL mainloop_event_filter(void *userdata, SDL_Event * event) {
+static int SDLCALL emloop_event_filter(void *userdata, SDL_Event * event) {
 	switch (event->type) {
 	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEBUTTONUP:
@@ -219,7 +219,7 @@ static int SDLCALL mainloop_event_filter(void *userdata, SDL_Event * event) {
 		if (SDL_PeepEvents(event, 1, SDL_ADDEVENT, 0, 0) <= 0) {
 			return -1;
 		}
-		mainloop_reenter_blessed();
+		emloop_reenter_blessed();
 		return 0;
 	}
 	// Handle all other events normally.
@@ -260,7 +260,7 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 #ifdef __EMSCRIPTEN__
 		// Hook into MainLoop so that SDL events (keyboard/mouse)
 		// trigger re-entry for immediate processing.
-		SDL_SetEventFilter(mainloop_event_filter, NULL);
+		SDL_SetEventFilter(emloop_event_filter, NULL);
 #endif
 
 	}
