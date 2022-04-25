@@ -1664,6 +1664,16 @@ void CNullDriver::drawMeshBuffer(const scene::IMeshBuffer* mb)
 		drawVertexPrimitiveList(mb->getVertices(), mb->getVertexCount(), mb->getIndices(), mb->getPrimitiveCount(), mb->getVertexType(), mb->getPrimitiveType(), mb->getIndexType());
 }
 
+void CNullDriver::prepareMeshBuffer(const scene::IMeshBuffer* mb)
+{
+	if (!mb)
+		return;
+
+	SHWBufferLink *HWBuffer=getBufferLink(mb);
+
+	if (HWBuffer)
+		updateHardwareBuffer(HWBuffer);
+}
 
 //! Draws the normals of a mesh buffer
 void CNullDriver::drawMeshBufferNormals(const scene::IMeshBuffer* mb, f32 length, SColor color)

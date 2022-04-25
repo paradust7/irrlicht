@@ -989,6 +989,10 @@ namespace video
 		/** \param mb Buffer to draw */
 		virtual void drawMeshBuffer(const scene::IMeshBuffer* mb) =0;
 
+                //! Update hardware buffer for a mesh buffer, if needed.
+		/** \param mb Buffer to prepare */
+                virtual void prepareMeshBuffer(const scene::IMeshBuffer* mb) =0;
+
 		//! Draws normals of a mesh buffer
 		/** \param mb Buffer to draw the normals of
 		\param length length scale factor of the normals
