@@ -30,7 +30,7 @@ CWebGL1Driver::CWebGL1Driver(const SIrrlichtCreationParameters& params, io::IFil
 	// - no mipmapping is used
 	// - no texture wrapping is used (so all texture_wraps have to be CLAMP_TO_EDGE)
 	// So users could still enable them for specific cases (usually GUI), but in general better to have it off.
-	disableFeature(EVDF_TEXTURE_NPOT);
+	//disableFeature(EVDF_TEXTURE_NPOT);
 
 	MBLinesSize2 = createSimpleMeshBuffer(2, scene::EPT_LINES);
 	MBTriangleFanSize4 = createSimpleMeshBuffer(4, scene::EPT_TRIANGLE_FAN);
