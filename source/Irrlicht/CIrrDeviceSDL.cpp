@@ -164,7 +164,6 @@ bool CIrrDeviceSDL::isNoUnicodeKey(EKEY_CODE key) const
 		case KEY_SNAPSHOT:
 		case KEY_INSERT:
 		case KEY_DELETE:
-		case KEY_HELP:
 		case KEY_LWIN:
 		case KEY_RWIN:
 		case KEY_APPS:
@@ -627,6 +626,45 @@ static bool GetCtrlState() {
     return state[SDL_SCANCODE_LCTRL] || state[SDL_SCANCODE_RCTRL];
 }
 
+#define FIXALL(FIXKEY) \
+	FIXKEY('`', '~') \
+	FIXKEY('1', '!') \
+	FIXKEY('2', '@') \
+	FIXKEY('3', '#') \
+	FIXKEY('4', '$') \
+	FIXKEY('5', '%') \
+	FIXKEY('6', '^') \
+	FIXKEY('7', '&') \
+	FIXKEY('8', '*') \
+	FIXKEY('9', '(') \
+	FIXKEY('0', ')') \
+	FIXKEY('-', '_') \
+	FIXKEY('=', '+') \
+	FIXKEY('[', '{') \
+	FIXKEY(']', '}') \
+	FIXKEY('\\', '|') \
+	FIXKEY(';', ':') \
+	FIXKEY('\'', '"') \
+	FIXKEY(',', '<') \
+	FIXKEY('.', '>') \
+	FIXKEY('/', '?')
+
+#define FIX_TO_UPPER(_lc, _uc) case _lc: return _uc;
+#define FIX_TO_LOWER(_lc, _uc) case _uc: return _lc;
+
+char FixShift(char c, int shift) {
+	if (shift) {
+		switch (c) {
+		FIXALL(FIX_TO_UPPER);
+		}
+	} else {
+		switch (c) {
+		FIXALL(FIX_TO_LOWER);
+		}
+	}
+	return c;
+}
+
 
 //! runs the device. Returns false if device wants to be deleted
 bool CIrrDeviceSDL::run()
@@ -781,15 +819,14 @@ bool CIrrDeviceSDL::run()
 		case SDL_KEYDOWN:
 		case SDL_KEYUP:
 			{
-				SDL_Keycode kc = SDL_event.key.keysym.sym;
-				bool isAscii = (kc >= ' ' && kc <= '~');
 				SKeyMap mp;
 				mp.SDLKey = SDL_event.key.keysym.sym;
 				s32 idx = KeyMap.binary_search(mp);
 
-				// For ascii, `Key` is always the upper-case version, Char is the original
-				EKEY_CODE key = isAscii ? (EKEY_CODE)irr::core::locale_upper(kc) : (EKEY_CODE)0;
-				if (!isAscii && idx != -1)
+				EKEY_CODE key;
+				if (idx == -1)
+					key = (EKEY_CODE)0;
+				else
 					key = (EKEY_CODE)KeyMap[idx].Win32Key;
 
 #ifdef _IRR_WINDOWS_API_
@@ -802,7 +839,7 @@ bool CIrrDeviceSDL::run()
 #endif
 				irrevent.EventType = irr::EET_KEY_INPUT_EVENT;
 
-				if (!isAscii && isNoUnicodeKey(key))
+				if (isNoUnicodeKey(key))
 					irrevent.KeyInput.Char = 0;
 				else
 					irrevent.KeyInput.Char = SDL_event.key.keysym.sym;
@@ -811,6 +848,9 @@ bool CIrrDeviceSDL::run()
 				irrevent.KeyInput.PressedDown = (SDL_event.type == SDL_KEYDOWN);
 				irrevent.KeyInput.Shift = (SDL_event.key.keysym.mod & KMOD_SHIFT) != 0;
 				irrevent.KeyInput.Control = (SDL_event.key.keysym.mod & KMOD_CTRL ) != 0;
+
+				// Why doesn't SDL give character code?
+				irrevent.KeyInput.Char = FixShift(irrevent.KeyInput.Char, irrevent.KeyInput.Shift);
 
 				// SDL2 no longer provides unicode character in the key event so we ensure the character is in the correct case
 				// TODO: Unicode input doesn't work like this, should probably use SDL_TextInputEvent
@@ -1262,9 +1302,16 @@ void CIrrDeviceSDL::createKeyMap()
 	// the lookuptable, but I'll leave it like that until
 	// I find a better version.
 
-	KeyMap.reallocate(105);
+	//KeyMap.reallocate(200);
 
 	// buttons missing
+	KeyMap.push_back(SKeyMap(SDLK_SEMICOLON, KEY_OEM_1));
+	KeyMap.push_back(SKeyMap(SDLK_SLASH, KEY_OEM_2));
+	KeyMap.push_back(SKeyMap(SDLK_BACKQUOTE, KEY_OEM_3));
+	KeyMap.push_back(SKeyMap(SDLK_LEFTBRACKET, KEY_OEM_4));
+	KeyMap.push_back(SKeyMap(SDLK_BACKSLASH, KEY_OEM_5));
+	KeyMap.push_back(SKeyMap(SDLK_RIGHTBRACKET, KEY_OEM_6));
+	KeyMap.push_back(SKeyMap(SDLK_QUOTE, KEY_OEM_7));
 
 	KeyMap.push_back(SKeyMap(SDLK_BACKSPACE, KEY_BACK));
 	KeyMap.push_back(SKeyMap(SDLK_TAB, KEY_TAB));
@@ -1299,7 +1346,8 @@ void CIrrDeviceSDL::createKeyMap()
 
 	KeyMap.push_back(SKeyMap(SDLK_INSERT, KEY_INSERT));
 	KeyMap.push_back(SKeyMap(SDLK_DELETE, KEY_DELETE));
-	KeyMap.push_back(SKeyMap(SDLK_HELP, KEY_HELP));
+	// interferes with slash
+	//KeyMap.push_back(SKeyMap(SDLK_HELP, KEY_HELP));
 
 	KeyMap.push_back(SKeyMap(SDLK_0, KEY_KEY_0));
 	KeyMap.push_back(SKeyMap(SDLK_1, KEY_KEY_1));
@@ -1387,7 +1435,7 @@ void CIrrDeviceSDL::createKeyMap()
 	KeyMap.push_back(SKeyMap(SDLK_LALT,  KEY_LMENU));
 	KeyMap.push_back(SKeyMap(SDLK_RALT,  KEY_RMENU));
 
-	KeyMap.push_back(SKeyMap(SDLK_PLUS,   KEY_PLUS));
+	KeyMap.push_back(SKeyMap(SDLK_EQUALS,   KEY_PLUS));
 	KeyMap.push_back(SKeyMap(SDLK_COMMA,  KEY_COMMA));
 	KeyMap.push_back(SKeyMap(SDLK_MINUS,  KEY_MINUS));
 	KeyMap.push_back(SKeyMap(SDLK_PERIOD, KEY_PERIOD));
