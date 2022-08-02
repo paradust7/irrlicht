@@ -8,7 +8,6 @@
 #include "IrrlichtDevice.h"
 #include "IImagePresenter.h"
 #include "SIrrCreationParameters.h"
-#include "CVideoModeList.h"
 #include "IContextManager.h"
 
 namespace irr
@@ -16,7 +15,6 @@ namespace irr
 	// lots of prototypes:
 	class ILogger;
 	class CLogger;
-	class IRandomizer;
 
 	namespace gui
 	{
@@ -74,9 +72,6 @@ namespace irr
 		//! \return Returns a pointer to the mouse cursor control interface.
 		virtual gui::ICursorControl* getCursorControl() _IRR_OVERRIDE_;
 
-		//! Returns a pointer to a list with all video modes supported by the gfx adapter.
-		virtual video::IVideoModeList* getVideoModeList() _IRR_OVERRIDE_;
-
 		//! return the context manager
 		virtual video::IContextManager* getContextManager() _IRR_OVERRIDE_;
 
@@ -101,15 +96,6 @@ namespace irr
 
 		//! Returns a pointer to the logger.
 		virtual ILogger* getLogger() _IRR_OVERRIDE_;
-
-		//! Provides access to the engine's currently set randomizer.
-		virtual IRandomizer* getRandomizer() const _IRR_OVERRIDE_;
-
-		//! Sets a new randomizer.
-		virtual void setRandomizer(IRandomizer* r) _IRR_OVERRIDE_;
-
-		//! Creates a new default randomizer.
-		virtual IRandomizer* createDefaultRandomizer() const _IRR_OVERRIDE_;
 
 		//! Returns the operation system opertator object.
 		virtual IOSOperator* getOSOperator() _IRR_OVERRIDE_;
@@ -159,12 +145,6 @@ namespace irr
         //! Is device motion available.
         virtual bool isDeviceMotionAvailable() _IRR_OVERRIDE_;
 
-		//! Set the current Gamma Value for the Display
-		virtual bool setGammaRamp( f32 red, f32 green, f32 blue, f32 brightness, f32 contrast ) _IRR_OVERRIDE_;
-
-		//! Get the current Gamma Value for the Display
-		virtual bool getGammaRamp( f32 &red, f32 &green, f32 &blue, f32 &brightness, f32 &contrast ) _IRR_OVERRIDE_;
-
 		//! Set the maximal elapsed time between 2 clicks to generate doubleclicks for the mouse. It also affects tripleclick behavior.
 		//! When set to 0 no double- and tripleclicks will be generated.
 		virtual void setDoubleClickTime( u32 timeMs ) _IRR_OVERRIDE_;
@@ -191,9 +171,6 @@ namespace irr
 		*/
 		virtual u32 checkSuccessiveClicks(s32 mouseX, s32 mouseY, EMOUSE_INPUT_EVENT inputEvent);
 
-		void calculateGammaRamp ( u16 *ramp, f32 gamma, f32 relativebrightness, f32 relativecontrast );
-		void calculateGammaFromRamp ( f32 &gamma, const u16 *ramp );
-
 		//! Checks whether the input device should take input from the IME
 		bool acceptsIME();
 
@@ -205,7 +182,6 @@ namespace irr
 		IEventReceiver* UserReceiver;
 		CLogger* Logger;
 		IOSOperator* Operator;
-		IRandomizer* Randomizer;
 		io::IFileSystem* FileSystem;
 		scene::ISceneManager* InputReceivingSceneManager;
 
@@ -222,7 +198,6 @@ namespace irr
 			EMOUSE_INPUT_EVENT LastMouseInputEvent;
 		};
 		SMouseMultiClicks MouseMultiClicks;
-		video::CVideoModeList* VideoModeList;
 		video::IContextManager* ContextManager;
 		SIrrlichtCreationParameters CreationParams;
 		bool Close;

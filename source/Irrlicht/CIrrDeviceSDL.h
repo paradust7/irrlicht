@@ -88,12 +88,6 @@ namespace irr
 		//! Activate any joysticks, and generate events for them.
 		virtual bool activateJoysticks(core::array<SJoystickInfo> & joystickInfo) _IRR_OVERRIDE_;
 
-		//! Set the current Gamma Value for the Display
-		virtual bool setGammaRamp( f32 red, f32 green, f32 blue, f32 brightness, f32 contrast ) _IRR_OVERRIDE_;
-
-		//! Get the current Gamma Value for the Display
-		virtual bool getGammaRamp( f32 &red, f32 &green, f32 &blue, f32 &brightness, f32 &contrast ) _IRR_OVERRIDE_;
-
 		//! Get the device type
 		virtual E_DEVICE_TYPE getType() const _IRR_OVERRIDE_
 		{
@@ -232,9 +226,6 @@ namespace irr
 	static EM_BOOL MouseLeaveCallback(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
 
 #endif
-		// Check if it's a special key like left, right, up down and so on which shouldn't have a Unicode character.
-		bool isNoUnicodeKey(EKEY_CODE key) const;
-
 		//! create the driver
 		void createDriver();
 

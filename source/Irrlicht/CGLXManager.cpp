@@ -7,7 +7,6 @@
 #ifdef _IRR_COMPILE_WITH_GLX_MANAGER_
 
 #include "os.h"
-#include <dlfcn.h>
 
 #if defined(_IRR_OPENGL_USE_EXTPOINTER_)
 	#define GL_GLEXT_LEGACY 1
@@ -29,7 +28,7 @@ namespace video
 {
 
 CGLXManager::CGLXManager(const SIrrlichtCreationParameters& params, const SExposedVideoData& videodata, int screennr)
-	: Params(params), PrimaryContext(videodata), VisualInfo(0), glxFBConfig(0), GlxWin(0), libHandle(NULL)
+	: Params(params), PrimaryContext(videodata), VisualInfo(0), glxFBConfig(0), GlxWin(0)
 {
 	#ifdef _DEBUG
 	setDebugName("CGLXManager");
@@ -280,8 +279,6 @@ bool CGLXManager::initialize(const SIrrlichtCreationParameters& params, const SE
 
 void CGLXManager::terminate()
 {
-	if (libHandle)
-		dlclose(libHandle);
 	memset((void*)&CurrentContext, 0, sizeof(CurrentContext));
 }
 
@@ -311,6 +308,16 @@ void CGLXManager::destroySurface()
 		glXDestroyWindow((Display*)CurrentContext.OpenGLLinux.X11Display, GlxWin);
 }
 
+#if defined(GLX_ARB_create_context)
+static int IrrIgnoreError(Display *display, XErrorEvent *event)
+{
+	char msg[256];
+	XGetErrorText(display, event->error_code, msg, 256);
+	os::Printer::log("Ignoring an X error", msg, ELL_DEBUG);
+	return 0;
+}
+#endif
+
 bool CGLXManager::generateContext()
 {
 	GLXContext context = 0;
@@ -329,13 +336,16 @@ bool CGLXManager::generateContext()
 
 			if (glxCreateContextAttribsARB)
 			{
+				os::Printer::log("GLX with GLX_ARB_create_context", ELL_DEBUG);
 				int contextAttrBuffer[] = {
 					GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
 					GLX_CONTEXT_MINOR_VERSION_ARB, 0,
 					// GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
 					None
 				};
+				XErrorHandler old = XSetErrorHandler(IrrIgnoreError);
 				context = glxCreateContextAttribsARB((Display*)CurrentContext.OpenGLLinux.X11Display, (GLXFBConfig)glxFBConfig, NULL, True, contextAttrBuffer);
+				XSetErrorHandler(old);
 				// transparently fall back to legacy call
 			}
 			if (!context)
@@ -456,15 +466,7 @@ void CGLXManager::destroyContext()
 
 void* CGLXManager::getProcAddress(const std::string &procName)
 {
-	void* proc = NULL;
-	proc = (void*)glXGetProcAddressARB(reinterpret_cast<const GLubyte*>(procName.c_str()));
-	if (!proc) {
-		if (!libHandle)
-			libHandle = dlopen("libGL.so", RTLD_LAZY);
-		if (libHandle)
-			proc = dlsym(libHandle, procName.c_str());
-	}
-	return proc;
+	return (void*)glXGetProcAddressARB(reinterpret_cast<const GLubyte*>(procName.c_str()));
 }
 
 bool CGLXManager::swapBuffers()

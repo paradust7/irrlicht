@@ -42,6 +42,20 @@ elseif(MSVC)
 	endif()
 endif()
 
+# Sanity-check version
+
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_INCLUDES ${PROJECT_SOURCE_DIR}/include)
+unset(REVISION_SANITY_CHECK CACHE)
+check_cxx_source_compiles("#include <IrrCompileConfig.h>\n\
+#if IRRLICHT_VERSION_MT_REVISION != ${IRRLICHTMT_REVISION}\n\
+#error\n\
+#endif\n\
+int main() {}" REVISION_SANITY_CHECK)
+if(NOT REVISION_SANITY_CHECK)
+	message(FATAL_ERROR "IrrlichtMt revision number mismatches between CMake and headers.")
+endif()
+
 # Required libs
 
 find_package(ZLIB REQUIRED)
@@ -77,11 +91,8 @@ if(OGL_ENABLED)
 	set(OpenGL_GL_PREFERENCE "LEGACY")
 	find_package(OpenGL REQUIRED)
 endif()
-if(NOT ANDROID AND NOT APPLE)
+if(UNIX AND NOT ANDROID AND NOT APPLE)
 	check_symbol_exists(_IRR_LINUX_X11_XINPUT2_ "IrrCompileConfig.h" XINPUT2_ENABLED)
-	if(XINPUT2_ENABLED)
-		find_library(XINPUT_LIBRARY Xi REQUIRED)
-	endif()
 endif()
 check_symbol_exists(_IRR_COMPILE_WITH_SDL_DEVICE_ "IrrCompileConfig.h" SDL_ENABLED)
 if(SDL_ENABLED)
@@ -102,6 +113,9 @@ elseif(APPLE)
 else()
 	# Unix probably
 	#find_package(X11 REQUIRED)
+	#if(XINPUT2_ENABLED AND NOT X11_Xi_FOUND)
+	#	message(FATAL_ERROR "XInput not found")
+	#endif()
 endif()
 
 set(link_includes
@@ -130,14 +144,14 @@ set(link_libs
 	${OPENGLES_LIBRARY}
 	${OPENGLES2_LIBRARIES}
 	${EGL_LIBRARY}
-	${XINPUT_LIBRARY}
 
 	"$<$<PLATFORM_ID:Android>:native_app_glue -landroid -llog>"
 	${COCOA_LIB}
 	${IOKIT_LIB}
 	"$<$<PLATFORM_ID:Windows>:gdi32>"
 	"$<$<PLATFORM_ID:Windows>:winmm>"
-	${X11_Xxf86vm_LIB}
+	${X11_X11_LIB}
+	${X11_Xi_LIB}
 )
 
 # Source files
@@ -165,7 +179,6 @@ add_library(IRROBJ OBJECT
 	CSceneCollisionManager.cpp
 	CSceneManager.cpp
 	CMeshCache.cpp
-	CDefaultSceneNodeFactory.cpp
 )
 
 set(IRRDRVROBJ
@@ -202,7 +215,6 @@ set(IRRIMAGEOBJ
 )
 
 add_library(IRRVIDEOOBJ OBJECT
-	CVideoModeList.cpp
 	CFPSCounter.cpp
 	${IRRDRVROBJ}
 	${IRRIMAGEOBJ}
@@ -216,17 +228,14 @@ add_library(IRRIOOBJ OBJECT
 	CReadFile.cpp
 	CWriteFile.cpp
 	CZipReader.cpp
-	CMountPointReader.cpp
 	CAttributes.cpp
 )
 
 add_library(IRROTHEROBJ OBJECT
 	CIrrDeviceSDL.cpp
 	CIrrDeviceLinux.cpp
-	CIrrDeviceConsole.cpp
 	CIrrDeviceStub.cpp
 	CIrrDeviceWin32.cpp
-	CIrrDeviceFB.cpp
 	CLogger.cpp
 	COSOperator.cpp
 	Irrlicht.cpp
@@ -255,32 +264,18 @@ add_library(IRRGUIOBJ OBJECT
 	CGUIButton.cpp
 	CGUICheckBox.cpp
 	CGUIComboBox.cpp
-	CGUIContextMenu.cpp
 	CGUIEditBox.cpp
 	CGUIEnvironment.cpp
 	CGUIFileOpenDialog.cpp
 	CGUIFont.cpp
 	CGUIImage.cpp
-	CGUIInOutFader.cpp
 	CGUIListBox.cpp
-	CGUIMenu.cpp
-	CGUIMeshViewer.cpp
-	CGUIMessageBox.cpp
-	CGUIModalScreen.cpp
 	CGUIScrollBar.cpp
-	CGUISpinBox.cpp
 	CGUISkin.cpp
 	CGUIStaticText.cpp
 	CGUITabControl.cpp
-	CGUITable.cpp
-	CGUIToolBar.cpp
-	CGUIWindow.cpp
-	CGUIColorSelectDialog.cpp
-	CDefaultGUIElementFactory.cpp
 	CGUISpriteBank.cpp
 	CGUIImageList.cpp
-	CGUITreeView.cpp
-	CGUIProfiler.cpp
 )
 
 # Library
@@ -316,7 +311,6 @@ endif()
 
 set_target_properties(IrrlichtMt PROPERTIES
 	VERSION ${PROJECT_VERSION}
-	SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
 )
 
 if(WIN32)

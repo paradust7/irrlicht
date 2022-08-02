@@ -227,7 +227,7 @@ public:
 	/** \return Pointer to the array. */
 	T* pointer()
 	{
-		return &m_data[0];
+		return m_data.empty() ? nullptr : &m_data[0];
 	}
 
 
@@ -235,7 +235,7 @@ public:
 	/** \return Pointer to the array. */
 	const T* const_pointer() const
 	{
-		return &m_data[0];
+		return m_data.empty() ? nullptr : &m_data[0];
 	}
 
 
@@ -394,7 +394,7 @@ public:
 	{
 		if (index >= m_data.size() || count < 1)
 			return;
-		count = std::min(count, (s32)m_data.size() - (s32)index);
+		count = core::min_(count, (s32)m_data.size() - (s32)index);
 		auto first = std::next(m_data.begin(), index);
 		auto last = std::next(first, count);
 		m_data.erase(first, last);

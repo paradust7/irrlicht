@@ -13,7 +13,6 @@
 #include "CTimer.h"
 #include "CLogger.h"
 #include "irrString.h"
-#include "IRandomizer.h"
 
 namespace irr
 {
@@ -21,8 +20,8 @@ namespace irr
 CIrrDeviceStub::CIrrDeviceStub(const SIrrlichtCreationParameters& params)
 : IrrlichtDevice(), VideoDriver(0), GUIEnvironment(0), SceneManager(0),
 	Timer(0), CursorControl(0), UserReceiver(params.EventReceiver),
-	Logger(0), Operator(0), Randomizer(0), FileSystem(0),
-	InputReceivingSceneManager(0), VideoModeList(0), ContextManager(0),
+	Logger(0), Operator(0), FileSystem(0),
+	InputReceivingSceneManager(0), ContextManager(0),
 	CreationParams(params), Close(false)
 {
 	Timer = new CTimer(params.UsePerformanceTimer);
@@ -40,10 +39,8 @@ CIrrDeviceStub::CIrrDeviceStub(const SIrrlichtCreationParameters& params)
 	Logger->setLogLevel(CreationParams.LoggingLevel);
 
 	os::Printer::Logger = Logger;
-	Randomizer = createDefaultRandomizer();
 
 	FileSystem = io::createFileSystem();
-	VideoModeList = new video::CVideoModeList();
 
 	core::stringc s = "Irrlicht Engine version ";
 	s.append(getVersion());
@@ -55,8 +52,6 @@ CIrrDeviceStub::CIrrDeviceStub(const SIrrlichtCreationParameters& params)
 
 CIrrDeviceStub::~CIrrDeviceStub()
 {
-	VideoModeList->drop();
-
 	if (GUIEnvironment)
 		GUIEnvironment->drop();
 
@@ -80,9 +75,6 @@ CIrrDeviceStub::~CIrrDeviceStub()
 
 	if (Operator)
 		Operator->drop();
-
-	if (Randomizer)
-		Randomizer->drop();
 
 	CursorControl = 0;
 
@@ -158,13 +150,6 @@ gui::ICursorControl* CIrrDeviceStub::getCursorControl()
 	return CursorControl;
 }
 
-
-//! \return Returns a pointer to a list with all video modes supported
-//! by the gfx adapter.
-video::IVideoModeList* CIrrDeviceStub::getVideoModeList()
-{
-	return VideoModeList;
-}
 
 //! return the context manager
 video::IContextManager* CIrrDeviceStub::getContextManager()
@@ -275,56 +260,6 @@ IOSOperator* CIrrDeviceStub::getOSOperator()
 }
 
 
-//! Provides access to the engine's currently set randomizer.
-IRandomizer* CIrrDeviceStub::getRandomizer() const
-{
-	return Randomizer;
-}
-
-//! Sets a new randomizer.
-void CIrrDeviceStub::setRandomizer(IRandomizer* r)
-{
-	if (r!=Randomizer)
-	{
-		if (Randomizer)
-			Randomizer->drop();
-		Randomizer=r;
-		if (Randomizer)
-			Randomizer->grab();
-	}
-}
-
-namespace
-{
-	struct SDefaultRandomizer : public IRandomizer
-	{
-		virtual void reset(s32 value=0x0f0f0f0f) _IRR_OVERRIDE_
-		{
-			os::Randomizer::reset(value);
-		}
-
-		virtual s32 rand() const _IRR_OVERRIDE_
-		{
-			return os::Randomizer::rand();
-		}
-
-		virtual s32 randMax() const _IRR_OVERRIDE_
-		{
-			return os::Randomizer::randMax();
-		}
-	};
-}
-
-//! Creates a new default randomizer.
-IRandomizer* CIrrDeviceStub::createDefaultRandomizer() const
-{
-	IRandomizer* r = new SDefaultRandomizer();
-	if (r)
-		r->reset();
-	return r;
-}
-
-
 //! Sets the input receiving scene manager.
 void CIrrDeviceStub::setInputReceivingSceneManager(scene::ISceneManager* sceneManager)
 {
@@ -426,60 +361,6 @@ bool CIrrDeviceStub::isDeviceMotionActive()
 bool CIrrDeviceStub::isDeviceMotionAvailable()
 {
     return false;
-}
-
-/*!
-*/
-void CIrrDeviceStub::calculateGammaRamp ( u16 *ramp, f32 gamma, f32 relativebrightness, f32 relativecontrast )
-{
-	s32 i;
-	s32 value;
-	s32 rbright = (s32) ( relativebrightness * (65535.f / 4 ) );
-	f32 rcontrast = 1.f / (255.f - ( relativecontrast * 127.5f ) );
-
-	gamma = gamma > 0.f ? 1.0f / gamma : 0.f;
-
-	for ( i = 0; i < 256; ++i )
-	{
-		value = (s32)(pow( rcontrast * i, gamma)*65535.f + 0.5f );
-		ramp[i] = (u16) core::s32_clamp ( value + rbright, 0, 65535 );
-	}
-
-}
-
-void CIrrDeviceStub::calculateGammaFromRamp ( f32 &gamma, const u16 *ramp )
-{
-	/* The following is adapted from a post by Garrett Bass on OpenGL
-	Gamedev list, March 4, 2000.
-	*/
-	f32 sum = 0.0;
-	s32 i, count = 0;
-
-	gamma = 1.0;
-	for ( i = 1; i < 256; ++i ) {
-		if ( (ramp[i] != 0) && (ramp[i] != 65535) ) {
-			f32 B = (f32)i / 256.f;
-			f32 A = ramp[i] / 65535.f;
-			sum += (f32) ( logf(A) / logf(B) );
-			count++;
-		}
-	}
-	if ( count && sum ) {
-		gamma = 1.0f / (sum / count);
-	}
-
-}
-
-//! Set the current Gamma Value for the Display
-bool CIrrDeviceStub::setGammaRamp( f32 red, f32 green, f32 blue, f32 brightness, f32 contrast )
-{
-	return false;
-}
-
-//! Get the current Gamma Value for the Display
-bool CIrrDeviceStub::getGammaRamp( f32 &red, f32 &green, f32 &blue, f32 &brightness, f32 &contrast )
-{
-	return false;
 }
 
 //! Set the maximal elapsed time between 2 clicks to generate doubleclicks for the mouse. It also affects tripleclick behavior.

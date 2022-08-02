@@ -6,8 +6,8 @@
 #define __IRR_COMPILE_CONFIG_H_INCLUDED__
 
 //! Identifies the IrrlichtMt fork customized for the Minetest engine
-#define IRRLICHT_VERSION_MT_REVISION 6
-#define IRRLICHT_VERSION_MT "mt6"
+#define IRRLICHT_VERSION_MT_REVISION 7
+#define IRRLICHT_VERSION_MT "mt7"
 
 //! Irrlicht SDK Version
 #define IRRLICHT_VERSION_MAJOR 1
@@ -37,8 +37,6 @@
 //! _IRR_COMPILE_WITH_OSX_DEVICE_ for Cocoa native windowing on OSX
 //! _IRR_COMPILE_WITH_X11_DEVICE_ for Linux X11 based device
 //! _IRR_COMPILE_WITH_SDL_DEVICE_ for platform independent SDL framework
-//! _IRR_COMPILE_WITH_CONSOLE_DEVICE_ for no windowing system, used as a fallback
-//! _IRR_COMPILE_WITH_FB_DEVICE_ for framebuffer systems
 
 //! Passing defines to the compiler which have NO in front of the _IRR definename is an alternative
 //! way which can be used to disable defines (instead of outcommenting them in this header).
@@ -50,12 +48,6 @@
 //#define _IRR_COMPILE_WITH_SDL_DEVICE_
 #ifdef NO_IRR_COMPILE_WITH_SDL_DEVICE_
 #undef _IRR_COMPILE_WITH_SDL_DEVICE_
-#endif
-
-//! Comment this line to compile without the fallback console device.
-#define _IRR_COMPILE_WITH_CONSOLE_DEVICE_
-#ifdef NO_IRR_COMPILE_WITH_CONSOLE_DEVICE_
-#undef _IRR_COMPILE_WITH_CONSOLE_DEVICE_
 #endif
 
 //! WIN32 for Windows32
@@ -280,19 +272,9 @@ define out. */
 #undef _IRR_COMPILE_WITH_X11_
 #endif
 
-//! On some Linux systems the XF86 vidmode extension, X11 RandR, or XInput2 are missing.
-//! Use these defines to add/remove support for those dependencies as needed.
-//! XInput2 (library called Xi) is currently only used to support touch-input.
 #if defined(_IRR_LINUX_PLATFORM_) && defined(_IRR_COMPILE_WITH_X11_)
-#define _IRR_LINUX_X11_VIDMODE_
-//#define _IRR_LINUX_X11_RANDR_
-//#define _IRR_LINUX_X11_XINPUT2_
-#ifdef NO_IRR_LINUX_X11_VIDMODE_
-#undef _IRR_LINUX_X11_VIDMODE_
-#endif
-#ifdef NO_IRR_LINUX_X11_RANDR_
-#undef _IRR_LINUX_X11_RANDR_
-#endif
+//! XInput2 (library called Xi) is currently only used to support touch-input.
+#define _IRR_LINUX_X11_XINPUT2_
 #ifdef NO_IRR_LINUX_X11_XINPUT2_
 #undef _IRR_LINUX_X11_XINPUT2_
 #endif
