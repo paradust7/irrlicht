@@ -137,18 +137,28 @@ EM_BOOL CIrrDeviceSDL::MouseLeaveCallback(int eventType, const EmscriptenMouseEv
 #endif
 
 #ifdef __EMSCRIPTEN__
+Uint32 SDL_NOOP_EVENT;
+
 static int SDLCALL emloop_event_filter(void *userdata, SDL_Event * event) {
 	switch (event->type) {
 	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEBUTTONUP:
 	case SDL_KEYDOWN:
 	case SDL_KEYUP:
+		// Ignore F11, so that it is handled by the browser.
+		if ((event->type == SDL_KEYDOWN || event->type == SDL_KEYUP) &&
+		    (event->key.keysym.sym == SDLK_F11 || event->key.keysym.scancode == SDLK_F11)) {
+			return 0;
+		}
 		// Push the event manually and re-enter the main loop so that it is processed immediately.
 		if (SDL_PeepEvents(event, 1, SDL_ADDEVENT, 0, 0) <= 0) {
 			return -1;
 		}
 		emloop_reenter_blessed();
-		return 0;
+		// Unfortunately, can't return 0 here, or else preventDefault() won't be called in the js event handler.
+		// But returning 1, the event is going to be pushed again. Modify the event to make it a no-op.
+		event->type = SDL_NOOP_EVENT;
+		return 1;
 	}
 	// Handle all other events normally.
 	return 1;
@@ -186,8 +196,9 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 		}
 
 #ifdef __EMSCRIPTEN__
-		// Hook into MainLoop so that SDL events (keyboard/mouse)
-		// trigger re-entry for immediate processing.
+		// This is an SDL hook to filter events, but we need to abuse it to make
+		// SDL events (keyboard/mouse) trigger re-entry for immediate processing.
+		SDL_NOOP_EVENT = SDL_RegisterEvents(1);
 		SDL_SetEventFilter(emloop_event_filter, NULL);
 #endif
 
@@ -556,46 +567,6 @@ static bool GetCtrlState() {
     return state[SDL_SCANCODE_LCTRL] || state[SDL_SCANCODE_RCTRL];
 }
 
-#define FIXALL(FIXKEY) \
-	FIXKEY('`', '~') \
-	FIXKEY('1', '!') \
-	FIXKEY('2', '@') \
-	FIXKEY('3', '#') \
-	FIXKEY('4', '$') \
-	FIXKEY('5', '%') \
-	FIXKEY('6', '^') \
-	FIXKEY('7', '&') \
-	FIXKEY('8', '*') \
-	FIXKEY('9', '(') \
-	FIXKEY('0', ')') \
-	FIXKEY('-', '_') \
-	FIXKEY('=', '+') \
-	FIXKEY('[', '{') \
-	FIXKEY(']', '}') \
-	FIXKEY('\\', '|') \
-	FIXKEY(';', ':') \
-	FIXKEY('\'', '"') \
-	FIXKEY(',', '<') \
-	FIXKEY('.', '>') \
-	FIXKEY('/', '?')
-
-#define FIX_TO_UPPER(_lc, _uc) case _lc: return _uc;
-#define FIX_TO_LOWER(_lc, _uc) case _uc: return _lc;
-
-char FixShift(char c, int shift) {
-	if (shift) {
-		switch (c) {
-		FIXALL(FIX_TO_UPPER);
-		}
-	} else {
-		switch (c) {
-		FIXALL(FIX_TO_LOWER);
-		}
-	}
-	return c;
-}
-
-
 //! runs the device. Returns false if device wants to be deleted
 bool CIrrDeviceSDL::run()
 {
@@ -783,9 +754,6 @@ bool CIrrDeviceSDL::run()
 				irrevent.KeyInput.PressedDown = (SDL_event.type == SDL_KEYDOWN);
 				irrevent.KeyInput.Shift = (SDL_event.key.keysym.mod & KMOD_SHIFT) != 0;
 				irrevent.KeyInput.Control = (SDL_event.key.keysym.mod & KMOD_CTRL ) != 0;
-
-				// Why doesn't SDL give character code?
-				//irrevent.KeyInput.Char = FixShift(irrevent.KeyInput.Char, irrevent.KeyInput.Shift);
 
 				// These keys are handled differently in CGUIEditBox.cpp (may become out of date!)
 				// Control key is used in special character combinations, so keep that too
