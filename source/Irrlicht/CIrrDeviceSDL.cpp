@@ -40,6 +40,9 @@ extern "C" {
 	EMSCRIPTEN_KEEPALIVE
 	void irrlicht_resize(int width, int height);
 
+	EMSCRIPTEN_KEEPALIVE
+	void irrlicht_force_pointerlock(void);
+
 	void emloop_reenter_blessed(void);
 }
 
@@ -50,6 +53,10 @@ static bool canvas_updated = false;
 
 EM_BOOL irrlicht_want_pointerlock(void) {
 	return want_pointerlock ? 1 : 0;
+}
+
+void irrlicht_force_pointerlock(void) {
+	want_pointerlock = true;
 }
 
 void irrlicht_resize(int width, int height) {
