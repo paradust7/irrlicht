@@ -213,6 +213,7 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 
 	// create keymap
 	createKeyMap();
+	KeySuppress = false;
 
 	if ( CreationParams.Fullscreen )
 		SDL_Flags |= SDL_WINDOW_FULLSCREEN;
@@ -564,6 +565,53 @@ void CIrrDeviceSDL::createDriver()
 	}
 }
 
+// This only handles single, printable, ascii characters.
+static char KeyAsText(const SDL_Keysym *keysym) {
+	if (keysym->mod & KMOD_CTRL)
+	{
+		return 0;
+	}
+	bool printable = keysym->sym >= 32 && keysym->sym < 127;
+	if (!printable)
+	{
+		return 0;
+	}
+	bool shiftSymbols = !!(keysym->mod & KMOD_SHIFT);
+	bool shiftLetters = shiftSymbols != !!(keysym->mod & KMOD_CAPS);
+	if (shiftLetters && keysym->sym >= 'a' && keysym->sym <= 'z')
+	{
+		return keysym->sym - 32;
+	}
+	if (shiftSymbols)
+	{
+		switch (keysym->sym)
+		{
+		case '`': return '~';
+		case '1': return '!';
+		case '2': return '@';
+		case '3': return '#';
+		case '4': return '$';
+		case '5': return '%';
+		case '6': return '^';
+		case '7': return '&';
+		case '8': return '*';
+		case '9': return '(';
+		case '0': return ')';
+		case '-': return '_';
+		case '=': return '+';
+		case '[': return '{';
+		case ']': return '}';
+		case '\\': return '|';
+		case ';': return ':';
+		case '\'': return '"';
+		case ',': return '<';
+		case '.': return '>';
+		case '/': return '?';
+		}
+	}
+	return keysym->sym;
+}
+
 //! runs the device. Returns false if device wants to be deleted
 bool CIrrDeviceSDL::run()
 {
@@ -730,6 +778,14 @@ bool CIrrDeviceSDL::run()
 
 		case SDL_TEXTINPUT:
 			{
+				// A single key press generates three SDL events: SDL_KEYDOWN, SDL_TEXTINPUT, and SDL_KEYUP.
+				// If the SDL_KEYDOWN handler emitted an EET_KEY_INPUT_EVENT that carries the character code,
+				// don't also generate EET_STRING_INPUT_EVENT. Doing so would duplicate the character.
+				if (KeySuppress && SDL_event.text.text[1] == 0) {
+					KeySuppress = false;
+					break;
+				}
+				KeySuppress = false;
 				irrevent.EventType = irr::EET_STRING_INPUT_EVENT;
 				irrevent.StringInput.Str = new core::stringw();
 				irr::core::multibyteToWString(*irrevent.StringInput.Str, SDL_event.text.text);
@@ -765,11 +821,11 @@ bool CIrrDeviceSDL::run()
 				irrevent.KeyInput.PressedDown = (SDL_event.type == SDL_KEYDOWN);
 				irrevent.KeyInput.Shift = (SDL_event.key.keysym.mod & KMOD_SHIFT) != 0;
 				irrevent.KeyInput.Control = (SDL_event.key.keysym.mod & KMOD_CTRL ) != 0;
-
+				irrevent.KeyInput.Char = (SDL_event.type == SDL_KEYDOWN) ? KeyAsText(&SDL_event.key.keysym) : 0;
+				KeySuppress = (irrevent.KeyInput.Char != 0);
 				// These keys are handled differently in CGUIEditBox.cpp (may become out of date!)
 				// Control key is used in special character combinations, so keep that too
 				// Pass through the keysym only then so no extra text gets input
-				irrevent.KeyInput.Char = 0;
 				if (mp.SDLKey == SDLK_DELETE || mp.SDLKey == SDLK_RETURN || mp.SDLKey == SDLK_BACKSPACE || irrevent.KeyInput.Control)
 					irrevent.KeyInput.Char = mp.SDLKey;
 				postEventFromUser(irrevent);

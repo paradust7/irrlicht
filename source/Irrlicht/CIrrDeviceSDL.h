@@ -286,6 +286,7 @@ namespace irr
 		};
 
 		core::array<SKeyMap> KeyMap;
+		bool KeySuppress;
 		SDL_SysWMinfo Info;
 	};
 
