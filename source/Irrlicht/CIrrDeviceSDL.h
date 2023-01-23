@@ -13,7 +13,6 @@
 
 #include "IrrlichtDevice.h"
 #include "CIrrDeviceStub.h"
-#include "IImagePresenter.h"
 #include "ICursorControl.h"
 
 #ifdef _IRR_EMSCRIPTEN_PLATFORM_
@@ -23,10 +22,12 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 
+#include <memory>
+
 namespace irr
 {
 
-	class CIrrDeviceSDL : public CIrrDeviceStub, video::IImagePresenter
+	class CIrrDeviceSDL : public CIrrDeviceStub
 	{
 	public:
 
@@ -59,9 +60,6 @@ namespace irr
 
 		//! returns color format of the window.
 		video::ECOLOR_FORMAT getColorFormat() const override;
-
-		//! presents a surface in the client area
-		bool present(video::IImage* surface, void* windowId=0, core::rect<s32>* src=0) override;
 
 		//! notifies the device that it should close itself
 		void closeDevice() override;
@@ -104,6 +102,7 @@ namespace irr
 			CCursorControl(CIrrDeviceSDL* dev, bool *want_pointerlock)
 				: Device(dev), IsVisible(true), WantPointerLock(want_pointerlock)
 			{
+				initCursors();
 			}
 
 			//! Changes the visible state of the mouse cursor.
@@ -192,6 +191,22 @@ namespace irr
 				}
 			}
 
+			void setActiveIcon(gui::ECURSOR_ICON iconId) override
+			{
+				ActiveIcon = iconId;
+				if (iconId > Cursors.size() || !Cursors[iconId]) {
+					iconId = gui::ECI_NORMAL;
+					if (iconId > Cursors.size() || !Cursors[iconId])
+						return;
+				}
+				SDL_SetCursor(Cursors[iconId].get());
+			}
+
+			gui::ECURSOR_ICON getActiveIcon() const override
+			{
+				return ActiveIcon;
+			}
+
 		private:
 
 			void updateCursorPos()
@@ -228,10 +243,21 @@ namespace irr
 #endif
 			}
 
+			void initCursors();
+
 			CIrrDeviceSDL* Device;
 			core::position2d<s32> CursorPos;
 			bool IsVisible;
 			bool *WantPointerLock; // external flag consumed by javascript
+
+			struct CursorDeleter {
+				void operator()(SDL_Cursor *ptr) {
+					if (ptr)
+						SDL_FreeCursor(ptr);
+				}
+			};
+			std::vector<std::unique_ptr<SDL_Cursor, CursorDeleter>> Cursors;
+			gui::ECURSOR_ICON ActiveIcon;
 		};
 
 	private:

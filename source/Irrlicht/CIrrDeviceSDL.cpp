@@ -489,22 +489,6 @@ void CIrrDeviceSDL::createDriver()
 
 		break;
 
-	case video::EDT_SOFTWARE:
-		#ifdef _IRR_COMPILE_WITH_SOFTWARE_
-		VideoDriver = video::createSoftwareDriver(CreationParams.WindowSize, CreationParams.Fullscreen, FileSystem, this);
-		#else
-		os::Printer::log("No Software driver support compiled in.", ELL_ERROR);
-		#endif
-		break;
-
-	case video::EDT_BURNINGSVIDEO:
-		#ifdef _IRR_COMPILE_WITH_BURNINGSVIDEO_
-		VideoDriver = video::createBurningVideoDriver(CreationParams, FileSystem, this);
-		#else
-		os::Printer::log("Burning's video driver was not compiled in.", ELL_ERROR);
-		#endif
-		break;
-
 	case video::EDT_OPENGL:
 		#ifdef _IRR_COMPILE_WITH_OPENGL_
 		ContextManager = new video::CSDLManager(this);
@@ -1036,90 +1020,6 @@ void CIrrDeviceSDL::setWindowCaption(const wchar_t* text)
 }
 
 
-//! presents a surface in the client area
-bool CIrrDeviceSDL::present(video::IImage* surface, void* windowId, core::rect<s32>* srcClip)
-{
-#ifdef _IRR_EMSCRIPTEN_PLATFORM_
-	return true;
-#else // !_IRR_EMSCRIPTEN_PLATFORM_
-	SDL_Surface *sdlSurface = SDL_CreateRGBSurfaceFrom(
-			surface->getData(), surface->getDimension().Width, surface->getDimension().Height,
-			surface->getBitsPerPixel(), surface->getPitch(),
-			surface->getRedMask(), surface->getGreenMask(), surface->getBlueMask(), surface->getAlphaMask());
-	if (!sdlSurface)
-		return false;
-	SDL_SetSurfaceAlphaMod(sdlSurface, 0);
-	SDL_SetColorKey(sdlSurface, 0, 0);
-	sdlSurface->format->BitsPerPixel=surface->getBitsPerPixel();
-	sdlSurface->format->BytesPerPixel=surface->getBytesPerPixel();
-	if ((surface->getColorFormat()==video::ECF_R8G8B8) ||
-			(surface->getColorFormat()==video::ECF_A8R8G8B8))
-	{
-		sdlSurface->format->Rloss=0;
-		sdlSurface->format->Gloss=0;
-		sdlSurface->format->Bloss=0;
-		sdlSurface->format->Rshift=16;
-		sdlSurface->format->Gshift=8;
-		sdlSurface->format->Bshift=0;
-		if (surface->getColorFormat()==video::ECF_R8G8B8)
-		{
-			sdlSurface->format->Aloss=8;
-			sdlSurface->format->Ashift=32;
-		}
-		else
-		{
-			sdlSurface->format->Aloss=0;
-			sdlSurface->format->Ashift=24;
-		}
-	}
-	else if (surface->getColorFormat()==video::ECF_R5G6B5)
-	{
-		sdlSurface->format->Rloss=3;
-		sdlSurface->format->Gloss=2;
-		sdlSurface->format->Bloss=3;
-		sdlSurface->format->Aloss=8;
-		sdlSurface->format->Rshift=11;
-		sdlSurface->format->Gshift=5;
-		sdlSurface->format->Bshift=0;
-		sdlSurface->format->Ashift=16;
-	}
-	else if (surface->getColorFormat()==video::ECF_A1R5G5B5)
-	{
-		sdlSurface->format->Rloss=3;
-		sdlSurface->format->Gloss=3;
-		sdlSurface->format->Bloss=3;
-		sdlSurface->format->Aloss=7;
-		sdlSurface->format->Rshift=10;
-		sdlSurface->format->Gshift=5;
-		sdlSurface->format->Bshift=0;
-		sdlSurface->format->Ashift=15;
-	}
-
-	SDL_Surface* scr = (SDL_Surface* )windowId;
-	if (!scr)
-		scr = SDL_GetWindowSurface(Window);
-	if (scr)
-	{
-		if (srcClip)
-		{
-			SDL_Rect sdlsrcClip;
-			sdlsrcClip.x = srcClip->UpperLeftCorner.X;
-			sdlsrcClip.y = srcClip->UpperLeftCorner.Y;
-			sdlsrcClip.w = srcClip->getWidth();
-			sdlsrcClip.h = srcClip->getHeight();
-			SDL_BlitSurface(sdlSurface, &sdlsrcClip, scr, NULL);
-		}
-		else
-			SDL_BlitSurface(sdlSurface, NULL, scr, NULL);
-		SDL_RenderPresent(SDL_GetRenderer(Window));
-	}
-
-	SDL_FreeSurface(sdlSurface);
-	return (scr != 0);
-#endif // !_IRR_EMSCRIPTEN_PLATFORM_
-}
-
-
 //! notifies the device that it should close itself
 void CIrrDeviceSDL::closeDevice()
 {
@@ -1393,6 +1293,25 @@ void CIrrDeviceSDL::createKeyMap()
 	// some special keys missing
 
 	KeyMap.sort();
+}
+
+void CIrrDeviceSDL::CCursorControl::initCursors()
+{
+	Cursors.reserve(gui::ECI_COUNT);
+
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW));     // ECI_NORMAL
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR)); // ECI_CROSS
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND));      // ECI_HAND
+	Cursors.emplace_back(nullptr);                                             // ECI_HELP
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM));     // ECI_IBEAM
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO));        // ECI_NO
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAIT));      // ECI_WAIT
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL));   // ECI_SIZEALL
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW));  // ECI_SIZENESW
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE));  // ECI_SIZENWSE
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS));    // ECI_SIZENS
+	Cursors.emplace_back(SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE));    // ECI_SIZEWE
+	Cursors.emplace_back(nullptr);                                             // ECI_UP
 }
 
 } // end namespace irr

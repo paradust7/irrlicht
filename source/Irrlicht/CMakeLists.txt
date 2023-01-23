@@ -240,8 +240,6 @@ add_library(IRROTHEROBJ OBJECT
 	COSOperator.cpp
 	Irrlicht.cpp
 	os.cpp
-	leakHunter.cpp
-	CProfiler.cpp
 )
 
 if(ANDROID)
