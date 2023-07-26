@@ -64,6 +64,9 @@ namespace irr
 		//! returns if window is minimized.
 		bool isWindowMinimized() const override;
 
+		//! returns last state from maximizeWindow() and restoreWindow()
+		bool isWindowMaximized() const override;
+
 		//! returns color format of the window.
 		video::ECOLOR_FORMAT getColorFormat() const override;
 
@@ -412,9 +415,13 @@ namespace irr
 		// text is utf-8
 		mutable core::stringc Clipboard;
 #endif
+#if defined(_IRR_LINUX_X11_XINPUT2_)
+		int currentTouchedCount;
+#endif
 		u32 Width, Height;
 		bool WindowHasFocus;
 		bool WindowMinimized;
+		bool WindowMaximized;
 		bool ExternalWindow;
 		int AutorepeatSupport;
 
@@ -449,10 +456,6 @@ namespace irr
 			JoystickInfo() : fd(-1), axes(0), buttons(0) { }
 		};
 		core::array<JoystickInfo> ActiveJoysticks;
-#endif
-
-#if defined(_IRR_LINUX_X11_XINPUT2_)
-		int currentTouchedCount;
 #endif
 	};
 
