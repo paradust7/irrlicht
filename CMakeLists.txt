@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.5)
 
-# Set policies up to 3.9 since we want to enable the IPO option
-if(${CMAKE_VERSION} VERSION_LESS 3.9)
+# >=3.9 enables IPO; >=3.11 prefers GLVND
+if(${CMAKE_VERSION} VERSION_LESS 3.11)
 	cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 else()
-	cmake_policy(VERSION 3.9)
+	cmake_policy(VERSION 3.11)
 endif()
 
-set(IRRLICHTMT_REVISION 9)
+set(IRRLICHTMT_REVISION 13)
 
 project(Irrlicht
 	VERSION 1.9.0.${IRRLICHTMT_REVISION}
@@ -15,6 +15,9 @@ project(Irrlicht
 )
 
 message(STATUS "*** Building IrrlichtMt ${PROJECT_VERSION} ***")
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(GNUInstallDirs)
 
@@ -38,7 +41,9 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+enable_testing()
 add_subdirectory(source/Irrlicht)
+add_subdirectory(test)
 
 option(BUILD_EXAMPLES "Build example applications" FALSE)
 if(BUILD_EXAMPLES)

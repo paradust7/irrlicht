@@ -2,12 +2,10 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_OBJ_MESH_FILE_LOADER_H_INCLUDED__
-#define __C_OBJ_MESH_FILE_LOADER_H_INCLUDED__
+#pragma once
 
 #include <map>
 #include "IMeshLoader.h"
-#include "IFileSystem.h"
 #include "ISceneManager.h"
 #include "irrString.h"
 #include "SMeshBuffer.h"
@@ -23,7 +21,7 @@ class COBJMeshFileLoader : public IMeshLoader
 public:
 
 	//! Constructor
-	COBJMeshFileLoader(scene::ISceneManager* smgr, io::IFileSystem* fs);
+	COBJMeshFileLoader(scene::ISceneManager* smgr);
 
 	//! destructor
 	virtual ~COBJMeshFileLoader();
@@ -104,13 +102,9 @@ private:
 	void cleanUp();
 
 	scene::ISceneManager* SceneManager;
-	io::IFileSystem* FileSystem;
 
 	core::array<SObjMtl*> Materials;
 };
 
 } // end namespace scene
 } // end namespace irr
-
-#endif
-

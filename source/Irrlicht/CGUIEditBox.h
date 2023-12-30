@@ -2,11 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_GUI_EDIT_BOX_H_INCLUDED__
-#define __C_GUI_EDIT_BOX_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_GUI_
+#pragma once
 
 #include "IGUIEditBox.h"
 #include "irrArray.h"
@@ -200,7 +196,3 @@ namespace gui
 
 } // end namespace gui
 } // end namespace irr
-
-#endif // _IRR_COMPILE_WITH_GUI_
-#endif // __C_GUI_EDIT_BOX_H_INCLUDED__
-

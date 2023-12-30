@@ -2,10 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in Irrlicht.h
 
-#ifndef __C_VIDEO_OPEN_GL_H_INCLUDED__
-#define __C_VIDEO_OPEN_GL_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
+#pragma once
 
 #include "SIrrCreationParameters.h"
 
@@ -446,7 +443,7 @@ namespace video
 		core::matrix4 Matrices[ETS_COUNT];
 		core::array<u8> ColorBuffer;
 
-		//! enumeration for rendering modes such as 2d and 3d for minizing the switching of renderStates.
+		//! enumeration for rendering modes such as 2d and 3d for minimizing the switching of renderStates.
 		enum E_RENDER_MODE
 		{
 			ERM_NONE = 0,	// no render state has been set yet.
@@ -493,5 +490,3 @@ namespace video
 
 
 #endif // _IRR_COMPILE_WITH_OPENGL_
-#endif
-

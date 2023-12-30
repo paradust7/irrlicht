@@ -10,8 +10,9 @@
 #include "irrArray.h"
 #include "irrMath.h"
 #include "EMaterialTypes.h"
-#include "EMaterialFlags.h"
+#include "EMaterialProps.h"
 #include "SMaterialLayer.h"
+#include "IrrCompileConfig.h" // for IRRLICHT_API
 
 namespace irr
 {
@@ -227,19 +228,6 @@ namespace video
 		ECM_DIFFUSE_AND_AMBIENT
 	};
 
-	//! DEPRECATED. Will be removed after Irrlicht 1.9.
-	/** Flags for the definition of the polygon offset feature. These flags define whether the offset should be into the screen, or towards the eye. */
-	enum E_POLYGON_OFFSET
-	{
-		//! Push pixel towards the far plane, away from the eye
-		/** This is typically used for rendering inner areas. */
-		EPO_BACK=0,
-		//! Pull pixels towards the camera.
-		/** This is typically used for polygons which should appear on top
-		of other elements, such as decals. */
-		EPO_FRONT=1
-	};
-
 	//! Names for polygon offset direction
 	const c8* const PolygonOffsetDirectionNames[] =
 	{
@@ -255,7 +243,7 @@ namespace video
 		EZW_OFF = 0,
 
 		//! This is the default setting for SMaterial and tries to handle things automatically.
-		//! This is also the value which is set when SMaterial::setFlag(EMF_ZWRITE_ENABLE) is enabled.
+		//! This is what you want to set to enable zwriting.
 		//! Usually zwriting is enabled non-transparent materials - as far as Irrlicht can recognize those.
 		//! Basically Irrlicht tries to handle the zwriting for you and assumes transparent materials don't need it.
 		//! This is addionally affected by IVideoDriver::setAllowZWriteOnTransparent
@@ -280,7 +268,7 @@ namespace video
 	/** SMaterial might ignore some textures in most function, like assignment and comparison,
 		when SIrrlichtCreationParameters::MaxTextureUnits is set to a lower number.
 	*/
-	const u32 MATERIAL_MAX_TEXTURES = _IRR_MATERIAL_MAX_TEXTURES_;
+	const u32 MATERIAL_MAX_TEXTURES = 4;
 
 	//! Struct for holding parameters for a material renderer
 	// Note for implementors: Serialization is in CNullDriver
@@ -288,21 +276,21 @@ namespace video
 	{
 	public:
 		//! Default constructor. Creates a solid, lit material with white colors
-		SMaterial()
-		: MaterialType(EMT_SOLID), AmbientColor(255,255,255,255), DiffuseColor(255,255,255,255),
-			EmissiveColor(0,0,0,0), SpecularColor(255,255,255,255),
-			Shininess(0.0f), MaterialTypeParam(0.0f), MaterialTypeParam2(0.0f), Thickness(1.0f),
-			ZBuffer(ECFN_LESSEQUAL), AntiAliasing(EAAM_SIMPLE), ColorMask(ECP_ALL),
-			ColorMaterial(ECM_DIFFUSE), BlendOperation(EBO_NONE), BlendFactor(0.0f),
-			PolygonOffsetFactor(0), PolygonOffsetDirection(EPO_FRONT),
-			PolygonOffsetDepthBias(0.f), PolygonOffsetSlopeScale(0.f),
-			Wireframe(false), PointCloud(false), GouraudShading(true),
-			Lighting(true), ZWriteEnable(EZW_AUTO), BackfaceCulling(true), FrontfaceCulling(false),
-			FogEnable(false), NormalizeNormals(false), UseMipMaps(true)
+		SMaterial() :
+				MaterialType(EMT_SOLID), AmbientColor(255, 255, 255, 255),
+				DiffuseColor(255, 255, 255, 255), EmissiveColor(0, 0, 0, 0),
+				SpecularColor(255, 255, 255, 255), Shininess(0.0f),
+				MaterialTypeParam(0.0f), Thickness(1.0f), ZBuffer(ECFN_LESSEQUAL),
+				AntiAliasing(EAAM_SIMPLE), ColorMask(ECP_ALL), ColorMaterial(ECM_DIFFUSE),
+				BlendOperation(EBO_NONE), BlendFactor(0.0f), PolygonOffsetDepthBias(0.f),
+				PolygonOffsetSlopeScale(0.f), Wireframe(false), PointCloud(false),
+				GouraudShading(true), Lighting(true), ZWriteEnable(EZW_AUTO),
+				BackfaceCulling(true), FrontfaceCulling(false), FogEnable(false),
+				NormalizeNormals(false), UseMipMaps(true)
 		{ }
 
 		//! Texture layer array.
-		SMaterialLayer TextureLayer[MATERIAL_MAX_TEXTURES];
+		SMaterialLayer TextureLayers[MATERIAL_MAX_TEXTURES];
 
 		//! Type of the material. Specifies how everything is blended together
 		E_MATERIAL_TYPE MaterialType;
@@ -349,10 +337,6 @@ namespace video
 		EMT_TRANSPARENT_ALPHA_CHANNEL and EMT_ONETEXTURE_BLEND. */
 		f32 MaterialTypeParam;
 
-		//! Second free parameter, dependent on the material type.
-		/** Mostly ignored. */
-		f32 MaterialTypeParam2;
-
 		//! Thickness of non-3dimensional elements such as lines and points.
 		f32 Thickness;
 
@@ -388,27 +372,15 @@ namespace video
 
 		//! Store the blend factors
 		/** textureBlendFunc/textureBlendFuncSeparate functions should be used to write
-		properly blending factors to this parameter. 
-		Due to historical reasons this parameter is not used for material type 
+		properly blending factors to this parameter.
+		Due to historical reasons this parameter is not used for material type
 		EMT_ONETEXTURE_BLEND which uses MaterialTypeParam instead for the blend factor.
 		It's generally used only for materials without any blending otherwise (like EMT_SOLID).
-		It's main use is to allow having shader materials which can enable/disable 
-		blending after they have been created. 
+		It's main use is to allow having shader materials which can enable/disable
+		blending after they have been created.
 		When you set this you usually also have to set BlendOperation to a value != EBO_NONE
 		(setting it to EBO_ADD is probably the most common one value). */
 		f32 BlendFactor;
-
-		//! DEPRECATED. Will be removed after Irrlicht 1.9. Please use PolygonOffsetDepthBias instead.
-		/** Factor specifying how far the polygon offset should be made.
-		Specifying 0 disables the polygon offset. The direction is specified separately.
-		The factor can be from 0 to 7.
-		Note: This probably never worked on Direct3D9 (was coded for D3D8 which had different value ranges)	*/
-		u8 PolygonOffsetFactor:3;
-
-		//! DEPRECATED. Will be removed after Irrlicht 1.9.
-		/** Flag defining the direction the polygon offset is applied to.
-		Can be to front or to back, specified by values from E_POLYGON_OFFSET. 	*/
-		E_POLYGON_OFFSET PolygonOffsetDirection:1;
 
 		//! A constant z-buffer offset for a polygon/line/point
 		/** The range of the value is driver specific.
@@ -429,9 +401,6 @@ namespace video
 		f32 PolygonOffsetSlopeScale;
 
 		//! Draw as wireframe or filled triangles? Default: false
-		/** The user can access a material flag using
-		\code material.Wireframe=true \endcode
-		or \code material.setFlag(EMF_WIREFRAME, true); \endcode */
 		bool Wireframe:1;
 
 		//! Draw as point cloud or filled triangles? Default: false
@@ -444,7 +413,7 @@ namespace video
 		bool Lighting:1;
 
 		//! Is the zbuffer writable or is it read-only. Default: EZW_AUTO.
-		/** If this parameter is not EZW_OFF, you probably also want to set ZBuffer 
+		/** If this parameter is not EZW_OFF, you probably also want to set ZBuffer
 		to values other than ECFN_DISABLED */
 		E_ZWRITE ZWriteEnable:2;
 
@@ -465,12 +434,22 @@ namespace video
 		/** Sometimes, disabling mipmap usage can be useful. Default: true */
 		bool UseMipMaps:1;
 
+		//! Execute a function on all texture layers.
+		/** Useful for setting properties which are not per material, but per
+		texture layer, e.g. bilinear filtering. */
+		template <typename F>
+		void forEachTexture(F &&fn) {
+			for (u32 i = 0; i < MATERIAL_MAX_TEXTURES; i++) {
+				fn(TextureLayers[i]);
+			}
+		}
+
 		//! Gets the texture transformation matrix for level i
 		/** \param i The desired level. Must not be larger than MATERIAL_MAX_TEXTURES
 		\return Texture matrix for texture level i. */
 		core::matrix4& getTextureMatrix(u32 i)
 		{
-			return TextureLayer[i].getTextureMatrix();
+			return TextureLayers[i].getTextureMatrix();
 		}
 
 		//! Gets the immutable texture transformation matrix for level i
@@ -479,7 +458,7 @@ namespace video
 		const core::matrix4& getTextureMatrix(u32 i) const
 		{
 			if (i<MATERIAL_MAX_TEXTURES)
-				return TextureLayer[i].getTextureMatrix();
+				return TextureLayers[i].getTextureMatrix();
 			else
 				return core::IdentityMatrix;
 		}
@@ -491,7 +470,7 @@ namespace video
 		{
 			if (i>=MATERIAL_MAX_TEXTURES)
 				return;
-			TextureLayer[i].setTextureMatrix(mat);
+			TextureLayers[i].setTextureMatrix(mat);
 		}
 
 		//! Gets the i-th texture
@@ -499,7 +478,7 @@ namespace video
 		\return Texture for texture level i, if defined, else 0. */
 		ITexture* getTexture(u32 i) const
 		{
-			return i < MATERIAL_MAX_TEXTURES ? TextureLayer[i].Texture : 0;
+			return i < MATERIAL_MAX_TEXTURES ? TextureLayers[i].Texture : 0;
 		}
 
 		//! Sets the i-th texture
@@ -510,144 +489,7 @@ namespace video
 		{
 			if (i>=MATERIAL_MAX_TEXTURES)
 				return;
-			TextureLayer[i].Texture = tex;
-		}
-
-		//! Sets the Material flag to the given value
-		/** \param flag The flag to be set.
-		\param value The new value for the flag. */
-		void setFlag(E_MATERIAL_FLAG flag, bool value)
-		{
-			switch (flag)
-			{
-				case EMF_WIREFRAME:
-					Wireframe = value; break;
-				case EMF_POINTCLOUD:
-					PointCloud = value; break;
-				case EMF_GOURAUD_SHADING:
-					GouraudShading = value; break;
-				case EMF_LIGHTING:
-					Lighting = value; break;
-				case EMF_ZBUFFER:
-					ZBuffer = value; break;
-				case EMF_ZWRITE_ENABLE:
-					ZWriteEnable = value ? EZW_AUTO : EZW_OFF; break;
-				case EMF_BACK_FACE_CULLING:
-					BackfaceCulling = value; break;
-				case EMF_FRONT_FACE_CULLING:
-					FrontfaceCulling = value; break;
-				case EMF_BILINEAR_FILTER:
-				{
-					for (u32 i=0; i<MATERIAL_MAX_TEXTURES; ++i)
-						TextureLayer[i].BilinearFilter = value;
-				}
-				break;
-				case EMF_TRILINEAR_FILTER:
-				{
-					for (u32 i=0; i<MATERIAL_MAX_TEXTURES; ++i)
-						TextureLayer[i].TrilinearFilter = value;
-				}
-				break;
-				case EMF_ANISOTROPIC_FILTER:
-				{
-					if (value)
-						for (u32 i=0; i<MATERIAL_MAX_TEXTURES; ++i)
-							TextureLayer[i].AnisotropicFilter = 0xFF;
-					else
-						for (u32 i=0; i<MATERIAL_MAX_TEXTURES; ++i)
-							TextureLayer[i].AnisotropicFilter = 0;
-				}
-				break;
-				case EMF_FOG_ENABLE:
-					FogEnable = value; break;
-				case EMF_NORMALIZE_NORMALS:
-					NormalizeNormals = value; break;
-				case EMF_TEXTURE_WRAP:
-				{
-					for (u32 i=0; i<MATERIAL_MAX_TEXTURES; ++i)
-					{
-						TextureLayer[i].TextureWrapU = (E_TEXTURE_CLAMP)value;
-						TextureLayer[i].TextureWrapV = (E_TEXTURE_CLAMP)value;
-						TextureLayer[i].TextureWrapW = (E_TEXTURE_CLAMP)value;
-					}
-				}
-				break;
-				case EMF_ANTI_ALIASING:
-					AntiAliasing = value?EAAM_SIMPLE:EAAM_OFF; break;
-				case EMF_COLOR_MASK:
-					ColorMask = value?ECP_ALL:ECP_NONE; break;
-				case EMF_COLOR_MATERIAL:
-					ColorMaterial = value?ECM_DIFFUSE:ECM_NONE; break;
-				case EMF_USE_MIP_MAPS:
-					UseMipMaps = value; break;
-				case EMF_BLEND_OPERATION:
-					BlendOperation = value?EBO_ADD:EBO_NONE; break;
-				case EMF_BLEND_FACTOR:
-					break;
-				case EMF_POLYGON_OFFSET:
-					PolygonOffsetFactor = value?1:0;
-					PolygonOffsetDirection = EPO_BACK;
-					PolygonOffsetSlopeScale = value?1.f:0.f;
-					PolygonOffsetDepthBias = value?1.f:0.f;
-				default:
-					break;
-			}
-		}
-
-		//! Gets the Material flag
-		/** \param flag The flag to query.
-		\return The current value of the flag. */
-		bool getFlag(E_MATERIAL_FLAG flag) const
-		{
-			switch (flag)
-			{
-				case EMF_WIREFRAME:
-					return Wireframe;
-				case EMF_POINTCLOUD:
-					return PointCloud;
-				case EMF_GOURAUD_SHADING:
-					return GouraudShading;
-				case EMF_LIGHTING:
-					return Lighting;
-				case EMF_ZBUFFER:
-					return ZBuffer!=ECFN_DISABLED;
-				case EMF_ZWRITE_ENABLE:
-					return ZWriteEnable != EZW_OFF;
-				case EMF_BACK_FACE_CULLING:
-					return BackfaceCulling;
-				case EMF_FRONT_FACE_CULLING:
-					return FrontfaceCulling;
-				case EMF_BILINEAR_FILTER:
-					return TextureLayer[0].BilinearFilter;
-				case EMF_TRILINEAR_FILTER:
-					return TextureLayer[0].TrilinearFilter;
-				case EMF_ANISOTROPIC_FILTER:
-					return TextureLayer[0].AnisotropicFilter!=0;
-				case EMF_FOG_ENABLE:
-					return FogEnable;
-				case EMF_NORMALIZE_NORMALS:
-					return NormalizeNormals;
-				case EMF_TEXTURE_WRAP:
-					return !(TextureLayer[0].TextureWrapU ||
-							TextureLayer[0].TextureWrapV ||
-							TextureLayer[0].TextureWrapW);
-				case EMF_ANTI_ALIASING:
-					return (AntiAliasing==1);
-				case EMF_COLOR_MASK:
-					return (ColorMask!=ECP_NONE);
-				case EMF_COLOR_MATERIAL:
-					return (ColorMaterial != ECM_NONE);
-				case EMF_USE_MIP_MAPS:
-					return UseMipMaps;
-				case EMF_BLEND_OPERATION:
-					return BlendOperation != EBO_NONE;
-				case EMF_BLEND_FACTOR:
-					return BlendFactor != 0.f;
-				case EMF_POLYGON_OFFSET:
-					return PolygonOffsetFactor != 0 || PolygonOffsetDepthBias != 0.f;
-			}
-
-			return false;
+			TextureLayers[i].Texture = tex;
 		}
 
 		//! Inequality operator
@@ -663,7 +505,6 @@ namespace video
 				SpecularColor != b.SpecularColor ||
 				Shininess != b.Shininess ||
 				MaterialTypeParam != b.MaterialTypeParam ||
-				MaterialTypeParam2 != b.MaterialTypeParam2 ||
 				Thickness != b.Thickness ||
 				Wireframe != b.Wireframe ||
 				PointCloud != b.PointCloud ||
@@ -680,15 +521,13 @@ namespace video
 				ColorMaterial != b.ColorMaterial ||
 				BlendOperation != b.BlendOperation ||
 				BlendFactor != b.BlendFactor ||
-				PolygonOffsetFactor != b.PolygonOffsetFactor ||
-				PolygonOffsetDirection != b.PolygonOffsetDirection ||
 				PolygonOffsetDepthBias != b.PolygonOffsetDepthBias ||
 				PolygonOffsetSlopeScale != b.PolygonOffsetSlopeScale ||
 				UseMipMaps != b.UseMipMaps
 				;
 			for (u32 i=0; (i<MATERIAL_MAX_TEXTURES) && !different; ++i)
 			{
-				different |= (TextureLayer[i] != b.TextureLayer[i]);
+				different |= (TextureLayers[i] != b.TextureLayers[i]);
 			}
 			return different;
 		}
@@ -727,10 +566,8 @@ namespace video
 		//! as it asks the material renders directly what they do with the material.
 		bool isTransparent() const
 		{
-			if ( MaterialType==EMT_TRANSPARENT_ADD_COLOR ||
-				MaterialType==EMT_TRANSPARENT_ALPHA_CHANNEL ||
-				MaterialType==EMT_TRANSPARENT_VERTEX_ALPHA ||
-				MaterialType==EMT_TRANSPARENT_REFLECTION_2_LAYER )
+			if ( MaterialType==EMT_TRANSPARENT_ALPHA_CHANNEL ||
+				MaterialType==EMT_TRANSPARENT_VERTEX_ALPHA )
 				return true;
 
 			return false;

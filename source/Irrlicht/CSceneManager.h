@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_SCENE_MANAGER_H_INCLUDED__
-#define __C_SCENE_MANAGER_H_INCLUDED__
+#pragma once
 
 #include "ISceneManager.h"
 #include "ISceneNode.h"
@@ -31,15 +30,10 @@ namespace scene
 	public:
 
 		//! constructor
-		CSceneManager(video::IVideoDriver* driver, io::IFileSystem* fs,
-			gui::ICursorControl* cursorControl, IMeshCache* cache = 0,
-			gui::IGUIEnvironment *guiEnvironment = 0);
+		CSceneManager(video::IVideoDriver* driver, gui::ICursorControl* cursorControl, IMeshCache* cache = 0);
 
 		//! destructor
 		virtual ~CSceneManager();
-
-		//! gets an animateable mesh. loads it if needed. returned pointer must not be dropped.
-		IAnimatedMesh* getMesh(const io::path& filename, const io::path& alternativeCacheName) override;
 
 		//! gets an animateable mesh. loads it if needed. returned pointer must not be dropped.
 		IAnimatedMesh* getMesh(io::IReadFile* file) override;
@@ -49,12 +43,6 @@ namespace scene
 
 		//! returns the video driver
 		video::IVideoDriver* getVideoDriver() override;
-
-		//! return the gui environment
-		gui::IGUIEnvironment* getGUIEnvironment() override;
-
-		//! return the filesystem
-		io::IFileSystem* getFileSystem() override;
 
 		//! adds a scene node for rendering an animated mesh model
 		virtual IAnimatedMeshSceneNode* addAnimatedMeshSceneNode(IAnimatedMesh* mesh, ISceneNode* parent=0, s32 id=-1,
@@ -282,12 +270,6 @@ namespace scene
 		//! video driver
 		video::IVideoDriver* Driver;
 
-		//! file system
-		io::IFileSystem* FileSystem;
-
-		//! GUI Enviroment ( Debug Purpose )
-		gui::IGUIEnvironment* GUIEnvironment;
-
 		//! cursor control
 		gui::ICursorControl* CursorControl;
 
@@ -324,6 +306,3 @@ namespace scene
 
 } // end namespace video
 } // end namespace scene
-
-#endif
-

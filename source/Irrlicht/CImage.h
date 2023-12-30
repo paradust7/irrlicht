@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_IMAGE_H_INCLUDED__
-#define __C_IMAGE_H_INCLUDED__
+#pragma once
 
 #include "IImage.h"
 #include "rect.h"
@@ -42,6 +41,9 @@ public:
 	//! sets a pixel
 	void setPixel(u32 x, u32 y, const SColor &color, bool blend = false ) override;
 
+	//! copies this surface into another, if it has the exact same size and format.
+	bool copyToNoScaling(void *target, u32 width, u32 height, ECOLOR_FORMAT format, u32 pitch=0) const override;
+
 	//! copies this surface into another, scaling it to fit.
 	void copyToScaling(void* target, u32 width, u32 height, ECOLOR_FORMAT format, u32 pitch=0) override;
 
@@ -71,7 +73,3 @@ private:
 
 } // end namespace video
 } // end namespace irr
-
-
-#endif
-

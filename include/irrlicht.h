@@ -29,12 +29,9 @@
 #ifndef __IRRLICHT_H_INCLUDED__
 #define __IRRLICHT_H_INCLUDED__
 
-#include "IrrCompileConfig.h"
 #include "aabbox3d.h"
-#include "CIndexBuffer.h"
 #include "CMeshBuffer.h"
 #include "coreutil.h"
-#include "CVertexBuffer.h"
 #include "dimension2d.h"
 #include "ECullingTypes.h"
 #include "EDebugSceneTypes.h"
@@ -43,7 +40,7 @@
 #include "EGUIAlignment.h"
 #include "EGUIElementTypes.h"
 #include "EHardwareBufferFlags.h"
-#include "EMaterialFlags.h"
+#include "EMaterialProps.h"
 #include "EMaterialTypes.h"
 #include "EMeshWriterEnums.h"
 #include "ESceneNodeTypes.h"
@@ -135,6 +132,7 @@
 #include "triangle3d.h"
 #include "vector2d.h"
 #include "vector3d.h"
+#include "IrrCompileConfig.h" // for IRRLICHT_API and IRRCALLCONV
 
 /*! \mainpage Irrlicht Engine 1.9 API documentation
  *
@@ -255,8 +253,7 @@ namespace irr
 	//! Creates an Irrlicht device. The Irrlicht device is the root object for using the engine.
 	/** If you need more parameters to be passed to the creation of the Irrlicht Engine device,
 	use the createDeviceEx() function.
-	\param driverType: Type of the video driver to use. This can currently be video::EDT_NULL,
-	video::EDT_SOFTWARE, video::EDT_BURNINGSVIDEO, video::EDT_DIRECT3D9 and video::EDT_OPENGL.
+	\param driverType: Type of the video driver to use.
 	\param windowSize: Size of the window or the video mode in fullscreen mode.
 	\param bits: Bits per pixel in fullscreen mode. Ignored if windowed mode.
 	\param fullscreen: Should be set to true if the device should run in fullscreen. Otherwise
@@ -271,7 +268,7 @@ namespace irr
 	device could not be created.
 	*/
 	extern "C" IRRLICHT_API IrrlichtDevice* IRRCALLCONV createDevice(
-		video::E_DRIVER_TYPE driverType = video::EDT_SOFTWARE,
+		video::E_DRIVER_TYPE driverType = video::EDT_OPENGL,
 		// parentheses are necessary for some compilers
 		const core::dimension2d<u32>& windowSize = (core::dimension2d<u32>(640,480)),
 		u32 bits = 32,
@@ -279,16 +276,6 @@ namespace irr
 		bool stencilbuffer = true,
 		bool vsync = false,
 		IEventReceiver* receiver = 0);
-
-	//! typedef for Function Pointer
-	typedef IrrlichtDevice* (IRRCALLCONV *funcptr_createDevice )(
-			video::E_DRIVER_TYPE driverType,
-			const core::dimension2d<u32>& windowSize,
-			u32 bits,
-			bool fullscreen,
-			bool stencilbuffer,
-			bool vsync,
-			IEventReceiver* receiver);
 
 
 	//! Creates an Irrlicht device with the option to specify advanced parameters.
@@ -301,10 +288,6 @@ namespace irr
 	device could not be created. */
 	extern "C" IRRLICHT_API IrrlichtDevice* IRRCALLCONV createDeviceEx(
 		const SIrrlichtCreationParameters& parameters);
-
-	//! typedef for Function Pointer
-	typedef IrrlichtDevice* (IRRCALLCONV *funcptr_createDeviceEx )( const SIrrlichtCreationParameters& parameters );
-
 
 	// THE FOLLOWING IS AN EMPTY LIST OF ALL SUB NAMESPACES
 	// EXISTING ONLY FOR THE DOCUMENTATION SOFTWARE DOXYGEN.

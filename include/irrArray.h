@@ -2,9 +2,7 @@
 // This file is part of the "Irrlicht Engine" and the "irrXML" project.
 // For conditions of distribution and use, see copyright notice in irrlicht.h and irrXML.h
 
-#ifndef __IRR_ARRAY_H_INCLUDED__
-#define __IRR_ARRAY_H_INCLUDED__
-
+#pragma once
 #include <algorithm>
 #include <iterator>
 #include <vector>
@@ -117,7 +115,7 @@ public:
 	//! Set (copy) data from given memory block
 	/** \param newData data to set, must have newSize elements
 	\param newSize Amount of elements in newData
-	\param canShrink When true we reallocate the array even it can shrink. 
+	\param canShrink When true we reallocate the array even it can shrink.
 	May reduce memory usage, but call is more whenever size changes.
 	\param newDataIsSorted Info if you pass sorted/unsorted data
 	*/
@@ -243,7 +241,7 @@ public:
 	/** \return Size of elements in the array which are actually occupied. */
 	u32 size() const
 	{
-		return m_data.size();
+		return static_cast<u32>(m_data.size());
 	}
 
 
@@ -319,7 +317,7 @@ public:
 		// *it = first element in [first, last) that is >= element, or last if not found.
 		if (*it < element || element < *it)
 			return -1;
-		return it - m_data.begin();
+		return static_cast<u32>(it - m_data.begin());
 	}
 
 
@@ -337,8 +335,8 @@ public:
 		auto iters = std::equal_range(m_data.begin(), m_data.end(), element);
 		if (iters.first == iters.second)
 			return -1;
-		last = (iters.second - m_data.begin()) - 1;
-		return iters.first - m_data.begin();
+		last = static_cast<s32>((iters.second - m_data.begin()) - 1);
+		return static_cast<s32>(iters.first - m_data.begin());
 	}
 
 
@@ -353,7 +351,7 @@ public:
 		auto it = std::find(m_data.begin(), m_data.end(), element);
 		if (it == m_data.end())
 			return -1;
-		return it - m_data.begin();
+		return static_cast<u32>(it - m_data.begin());
 	}
 
 
@@ -438,5 +436,4 @@ private:
 } // end namespace core
 } // end namespace irr
 
-#endif
 

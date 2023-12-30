@@ -4,8 +4,7 @@
 
 //New skinned mesh
 
-#ifndef __C_SKINNED_MESH_H_INCLUDED__
-#define __C_SKINNED_MESH_H_INCLUDED__
+#pragma once
 
 #include "ISkinnedMesh.h"
 #include "SMeshBuffer.h"
@@ -71,9 +70,6 @@ namespace scene
 
 		//! set user axis aligned bounding box
 		void setBoundingBox( const core::aabbox3df& box) override;
-
-		//! sets a flag of all contained materials to a new value
-		void setMaterialFlag(video::E_MATERIAL_FLAG flag, bool newvalue) override;
 
 		//! set the hardware mapping hint, for driver
 		void setHardwareMappingHint(E_HARDWARE_MAPPING newMappingHint, E_BUFFER_TYPE buffer=EBT_VERTEX_AND_INDEX) override;
@@ -218,6 +214,3 @@ private:
 
 } // end namespace scene
 } // end namespace irr
-
-#endif
-

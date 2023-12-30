@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __IRR_POINT_3D_H_INCLUDED__
-#define __IRR_POINT_3D_H_INCLUDED__
+#pragma once
 
 #include "irrMath.h"
 
@@ -155,7 +154,7 @@ namespace core
 
 		//! Calculates the cross product with another vector.
 		/** \param p Vector to multiply with.
-		\return Crossproduct of this vector with p. */
+		\return Cross product of this vector with p. */
 		vector3d<T> crossProduct(const vector3d<T>& p) const
 		{
 			return vector3d<T>(Y * p.Z - Z * p.Y, Z * p.X - X * p.Z, X * p.Y - Y * p.X);
@@ -207,7 +206,10 @@ namespace core
 		}
 
 		//! Rotates the vector by a specified number of degrees around the Y axis and the specified center.
-		/** \param degrees Number of degrees to rotate around the Y axis.
+		/** CAREFUL: For historical reasons rotateXZBy uses a right-handed rotation
+		(maybe to make it more similar to the 2D vector rotations which are counterclockwise).
+		To have this work the same way as rest of Irrlicht (nodes, matrices, other rotateBy functions) pass -1*degrees in here.
+		\param degrees Number of degrees to rotate around the Y axis.
 		\param center The center of the rotation. */
 		void rotateXZBy(f64 degrees, const vector3d<T>& center=vector3d<T>())
 		{
@@ -485,5 +487,4 @@ struct hash<irr::core::vector3d<T> >
 
 }
 
-#endif
 

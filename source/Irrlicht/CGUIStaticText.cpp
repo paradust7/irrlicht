@@ -3,7 +3,6 @@
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
 #include "CGUIStaticText.h"
-#ifdef _IRR_COMPILE_WITH_GUI_
 
 #include "IGUISkin.h"
 #include "IGUIEnvironment.h"
@@ -99,7 +98,7 @@ void CGUIStaticText::draw()
 						font->getDimension(Text.c_str()).Width;
 				}
 
-				font->draw(Text.c_str(), frameRect, 
+				font->draw(Text.c_str(), frameRect,
 					getActiveColor(),
 					HAlign == EGUIA_CENTER, VAlign == EGUIA_CENTER, (RestrainTextInside ? &AbsoluteClippingRect : NULL));
 			}
@@ -592,6 +591,3 @@ s32 CGUIStaticText::getTextWidth() const
 
 } // end namespace gui
 } // end namespace irr
-
-#endif // _IRR_COMPILE_WITH_GUI_
-

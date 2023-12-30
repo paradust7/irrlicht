@@ -4,8 +4,7 @@
 
 // Modified version with rigging/skinning support
 
-#ifndef __IRR_B3D_MESH_WRITER_H_INCLUDED__
-#define __IRR_B3D_MESH_WRITER_H_INCLUDED__
+#pragma once
 
 #include "IMeshWriter.h"
 #include "IWriteFile.h"
@@ -37,7 +36,7 @@ private:
     u32 getJointChunkSize(const ISkinnedMesh* mesh, ISkinnedMesh::SJoint* joint);
     core::array<ISkinnedMesh::SJoint*> getRootJoints(const ISkinnedMesh* mesh);
 
-    u32 getUVlayerCount(IMesh *mesh);
+    u32 getUVlayerCount(const IMesh *mesh);
     ISkinnedMesh* getSkinned (IMesh *mesh);
 
     inline void writeVector2(io::IWriteFile* file, const core::vector2df& vec);
@@ -50,4 +49,3 @@ private:
 } // end namespace
 } // end namespace
 
-#endif

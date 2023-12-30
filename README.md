@@ -1,9 +1,8 @@
 IrrlichtMt version 1.9
 ======================
 
-The Irrlicht Engine is an open source realtime 3D engine written in C++.
-
-This is a fork by the [Minetest](https://github.com/minetest) developers that was stripped-down and customized specifically for use in Minetest.
+IrrlichtMt is the 3D engine of [Minetest](https://github.com/minetest).
+It is based on the [Irrlicht Engine](https://irrlicht.sourceforge.io/) but is now developed independently.
 It is intentionally not compatible to upstream and is planned to be eventually absorbed into Minetest.
 
 Build
@@ -20,6 +19,11 @@ The following libraries are required to be installed:
 Aside from standard search options (`ZLIB_INCLUDE_DIR`, `ZLIB_LIBRARY`, ...) the following options are available:
 * `BUILD_SHARED_LIBS` (default: `ON`) - Build IrrlichtMt as a shared library
 * `BUILD_EXAMPLES` (default: `OFF`) - Build example applications
+* `ENABLE_OPENGL` - Enable OpenGL driver
+* `ENABLE_OPENGL3` (default: `OFF`) - Enable OpenGL 3+ driver
+* `ENABLE_GLES1` - Enable OpenGL ES driver, legacy
+* `ENABLE_GLES2` - Enable OpenGL ES 2+ driver
+* `USE_SDL2` (default: `OFF`) - Use SDL2 instead of native platform device
 
 e.g. on a Linux system you might want to build for local use like this:
 

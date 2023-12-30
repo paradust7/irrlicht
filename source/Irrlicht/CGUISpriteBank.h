@@ -2,11 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_GUI_SPRITE_BANK_H_INCLUDED__
-#define __C_GUI_SPRITE_BANK_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_GUI_
+#pragma once
 
 #include "IGUISpriteBank.h"
 
@@ -67,19 +63,7 @@ public:
 
 protected:
 
-	inline u32 getFrameNr(u32 index, u32 time, bool loop) const
-	{
-		u32 frame = 0;
-		if (Sprites[index].frameTime && Sprites[index].Frames.size() )
-		{
-			u32 f = (time / Sprites[index].frameTime);
-			if (loop)
-				frame = f % Sprites[index].Frames.size();
-			else
-				frame = (f >= Sprites[index].Frames.size()) ? Sprites[index].Frames.size()-1 : f;
-		}
-		return frame;
-	}
+	bool getFrameNr(u32& frameNr, u32 index, u32 time, bool loop) const;
 
 	struct SDrawBatch
 	{
@@ -98,8 +82,3 @@ protected:
 
 } // end namespace gui
 } // end namespace irr
-
-#endif // _IRR_COMPILE_WITH_GUI_
-
-#endif // __C_GUI_SPRITE_BANK_H_INCLUDED__
-

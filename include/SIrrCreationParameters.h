@@ -11,7 +11,7 @@
 #include "ILogger.h"
 #include "position2d.h"
 #include "path.h"
-#include "IrrCompileConfig.h"
+#include "IrrCompileConfig.h" // for IRRLICHT_SDK_VERSION
 
 namespace irr
 {
@@ -24,12 +24,13 @@ namespace irr
 		//! Constructs a SIrrlichtCreationParameters structure with default values.
 		SIrrlichtCreationParameters() :
 			DeviceType(EIDT_BEST),
-			DriverType(video::EDT_BURNINGSVIDEO),
+			DriverType(video::EDT_OPENGL),
 			WindowSize(core::dimension2d<u32>(800, 600)),
 			WindowPosition(core::position2di(-1,-1)),
 			Bits(32),
 			ZBufferBits(24),
 			Fullscreen(false),
+			WindowMaximized(false),
 			WindowResizable(2),
 			Stencilbuffer(true),
 			Vsync(false),
@@ -39,7 +40,6 @@ namespace irr
 			Doublebuffer(true),
 			IgnoreInput(false),
 			Stereobuffer(false),
-			HighPrecisionFPU(false),
 			EventReceiver(0),
 			WindowId(0),
 #ifdef _DEBUG
@@ -47,12 +47,9 @@ namespace irr
 #else
 			LoggingLevel(ELL_INFORMATION),
 #endif
-			DisplayAdapter(0),
-			DriverMultithreaded(false),
-			UsePerformanceTimer(true),
 			SDK_version_do_not_use(IRRLICHT_SDK_VERSION),
 			PrivateData(0),
-#if defined(_IRR_COMPILE_WITH_IOS_DEVICE_) || defined(_IRR_ANDROID_PLATFORM_)
+#ifdef IRR_MOBILE_PATHS
 			OGLES2ShaderPath("media/Shaders/")
 #elif defined(_IRR_EMSCRIPTEN_PLATFORM_)
 			OGLES2ShaderPath("/minetest/media/Shaders/")
@@ -75,6 +72,7 @@ namespace irr
 			Bits = other.Bits;
 			ZBufferBits = other.ZBufferBits;
 			Fullscreen = other.Fullscreen;
+			WindowMaximized = other.WindowMaximized;
 			WindowResizable = other.WindowResizable;
 			Stencilbuffer = other.Stencilbuffer;
 			Vsync = other.Vsync;
@@ -84,13 +82,9 @@ namespace irr
 			Doublebuffer = other.Doublebuffer;
 			IgnoreInput = other.IgnoreInput;
 			Stereobuffer = other.Stereobuffer;
-			HighPrecisionFPU = other.HighPrecisionFPU;
 			EventReceiver = other.EventReceiver;
 			WindowId = other.WindowId;
 			LoggingLevel = other.LoggingLevel;
-			DisplayAdapter = other.DisplayAdapter;
-			DriverMultithreaded = other.DriverMultithreaded;
-			UsePerformanceTimer = other.UsePerformanceTimer;
 			PrivateData = other.PrivateData;
 			OGLES2ShaderPath = other.OGLES2ShaderPath;
 			return *this;
@@ -108,9 +102,6 @@ namespace irr
 		E_DEVICE_TYPE DeviceType;
 
 		//! Type of video driver used to render graphics.
-		/** This can currently be video::EDT_NULL, video::EDT_SOFTWARE,
-		video::EDT_BURNINGSVIDEO, video::EDT_DIRECT3D9, and video::EDT_OPENGL.
-		Default: EDT_BURNINGSVIDEO. */
 		video::E_DRIVER_TYPE DriverType;
 
 		//! Size of the window or the video mode in fullscreen mode. Default: 800x600
@@ -128,6 +119,9 @@ namespace irr
 		//! Should be set to true if the device should run in fullscreen.
 		/** Otherwise the device runs in windowed mode. Default: false. */
 		bool Fullscreen;
+
+		//! Maximised window. (Only supported on SDL.) Default: false
+		bool WindowMaximized;
 
 		//! Should a non-fullscreen window be resizable.
 		/** Might not be supported by all devices. Ignored when Fullscreen is true.
@@ -216,15 +210,6 @@ namespace irr
 		Default value: false */
 		bool Stereobuffer;
 
-		//! Specifies if the device should use high precision FPU setting
-		/** This is only relevant for DirectX Devices, which switch to
-		low FPU precision by default for performance reasons. However,
-		this may lead to problems with the other computations of the
-		application. In this case setting this flag to true should help
-		- on the expense of performance loss, though.
-		Default value: false */
-		bool HighPrecisionFPU;
-
 		//! A user created event receiver.
 		IEventReceiver* EventReceiver;
 
@@ -232,7 +217,6 @@ namespace irr
 		/** If this is set to a value other than 0, the Irrlicht Engine
 		will be created in an already existing window.
 		For Windows, set this to the HWND of the window you want.
-		For iOS, assign UIView to this variable.
 		The windowSize and FullScreen options will be ignored when using
 		the WindowId parameter. Default this is set to 0.
 		To make Irrlicht run inside the custom window, you still will
@@ -289,23 +273,6 @@ namespace irr
 		then you have to change it here.
 		*/
 		ELOG_LEVEL LoggingLevel;
-
-		//! Allows to select which graphic card is used for rendering when more than one card is in the system.
-		/** So far only supported on D3D */
-		u32 DisplayAdapter;
-
-		//! Create the driver multithreaded.
-		/** Default is false. Enabling this can slow down your application.
-			Note that this does _not_ make Irrlicht threadsafe, but only the underlying driver-API for the graphiccard.
-			So far only supported on D3D. */
-		bool DriverMultithreaded;
-
-		//! Enables use of high performance timers on Windows platform.
-		/** When performance timers are not used, standard GetTickCount()
-		is used instead which usually has worse resolution, but also less
-		problems with speed stepping and other techniques.
-		*/
-		bool UsePerformanceTimer;
 
 		//! Don't use or change this parameter.
 		/** Always set it to IRRLICHT_SDK_VERSION, which is done by default.

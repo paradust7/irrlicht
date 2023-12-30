@@ -5,6 +5,7 @@ install_manifest.txt
 IrrlichtMtConfig.cmake
 IrrlichtMtConfigVersion.cmake
 IrrlichtMtTargets.cmake
+CTestTestfile.cmake
 Makefile
 libs/*
 *.so*
@@ -19,3 +20,6 @@ scripts/glext.h
 *.dir/
 *.sln
 *visualstudio/
+
+# vscode cmake plugin
+build/*

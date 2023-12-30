@@ -2,10 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_OPENGL_SHADER_MATERIAL_RENDERER_H_INCLUDED__
-#define __C_OPENGL_SHADER_MATERIAL_RENDERER_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
+#pragma once
 
 #ifdef _IRR_COMPILE_WITH_OPENGL_
 
@@ -46,7 +43,7 @@ public:
 
 	//! Access the callback provided by the users when creating shader materials
 	IShaderConstantSetCallBack* getShaderConstantSetCallBack() const override
-	{ 
+	{
 		return CallBack;
 	}
 
@@ -70,15 +67,14 @@ protected:
 	IShaderConstantSetCallBack* CallBack;
 
 	// I didn't write this, but here's my understanding:
-	// Those flags seem to be exclusive so far (so could be an enum). 
+	// Those flags seem to be exclusive so far (so could be an enum).
 	// Maybe the idea was to make them non-exclusive in future (basically having a shader-material)
 	// Actually currently there's not even any need to cache them (probably even slower than not doing so).
-	// They seem to be mostly for downward compatibility. 
+	// They seem to be mostly for downward compatibility.
 	// I suppose the idea is to use SMaterial.BlendOperation + SMaterial.BlendFactor and a simple non-transparent type as base for more flexibility in the future.
 	// Note that SMaterial.BlendOperation + SMaterial.BlendFactor are in some drivers already evaluated before OnSetMaterial.
 	bool Alpha;
 	bool Blending;
-	bool FixedBlending;
 	bool AlphaTest;
 
 	GLuint VertexShader;
@@ -93,5 +89,3 @@ protected:
 } // end namespace irr
 
 #endif
-#endif
-

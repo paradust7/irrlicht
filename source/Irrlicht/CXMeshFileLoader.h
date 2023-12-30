@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_X_MESH_FILE_LOADER_H_INCLUDED__
-#define __C_X_MESH_FILE_LOADER_H_INCLUDED__
+#pragma once
 
 #include "IMeshLoader.h"
 #include "irrString.h"
@@ -14,7 +13,6 @@ namespace irr
 {
 namespace io
 {
-	class IFileSystem;
 	class IReadFile;
 } // end namespace io
 namespace scene
@@ -27,7 +25,7 @@ class CXMeshFileLoader : public IMeshLoader
 public:
 
 	//! Constructor
-	CXMeshFileLoader(scene::ISceneManager* smgr, io::IFileSystem* fs);
+	CXMeshFileLoader(scene::ISceneManager* smgr);
 
 	//! returns true if the file maybe is able to be loaded by this class
 	//! based on the file extension (e.g. ".cob")
@@ -169,6 +167,8 @@ private:
 	u32 Line;
 	io::path FilePath;
 
+	bool ErrorState;
+
 	CSkinnedMesh::SJoint *CurFrame;
 
 	core::array<SXMesh*> Meshes;
@@ -181,5 +181,3 @@ private:
 
 } // end namespace scene
 } // end namespace irr
-
-#endif

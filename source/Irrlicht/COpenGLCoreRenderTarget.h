@@ -2,14 +2,17 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_OGLCORE_RENDER_TARGET_H_INCLUDED__
-#define __C_OGLCORE_RENDER_TARGET_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
-
-#if defined(_IRR_COMPILE_WITH_OPENGL_) || defined(_IRR_COMPILE_WITH_OGLES1_) || defined(_IRR_COMPILE_WITH_OGLES2_)
+#pragma once
 
 #include "IRenderTarget.h"
+
+#ifndef GL_FRAMEBUFFER_INCOMPLETE_FORMATS
+#define GL_FRAMEBUFFER_INCOMPLETE_FORMATS GL_FRAMEBUFFER_INCOMPLETE_FORMATS_EXT
+#endif
+
+#ifndef GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS
+#define GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS_EXT
+#endif
 
 namespace irr
 {
@@ -130,7 +133,7 @@ public:
 			TOpenGLTexture* currentTexture = (depthStencil && depthStencil->getDriverType() == DriverType) ? static_cast<TOpenGLTexture*>(depthStencil) : 0;
 
 			if (currentTexture)
-			{	
+			{
 				if (currentTexture->getType() == ETT_2D)
 				{
 					GLuint textureID = currentTexture->getOpenGLTextureName();
@@ -391,6 +394,3 @@ protected:
 
 }
 }
-
-#endif
-#endif

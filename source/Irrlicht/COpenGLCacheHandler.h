@@ -2,10 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in Irrlicht.h
 
-#ifndef __C_OPENGL_CACHE_HANDLER_H_INCLUDED__
-#define __C_OPENGL_CACHE_HANDLER_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
+#pragma once
 
 #ifdef _IRR_COMPILE_WITH_OPENGL_
 
@@ -63,4 +60,3 @@ namespace video
 } // end namespace irr
 
 #endif // _IRR_COMPILE_WITH_OPENGL_
-#endif

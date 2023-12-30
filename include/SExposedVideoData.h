@@ -5,12 +5,6 @@
 #ifndef __S_EXPOSED_VIDEO_DATA_H_INCLUDED__
 #define __S_EXPOSED_VIDEO_DATA_H_INCLUDED__
 
-// forward declarations for internal pointers
-struct IDirect3D9;
-struct IDirect3DDevice9;
-struct IDirect3D8;
-struct IDirect3DDevice8;
-
 namespace irr
 {
 namespace video
@@ -26,19 +20,6 @@ struct SExposedVideoData
 {
 	SExposedVideoData() {OpenGLWin32.HDc=0; OpenGLWin32.HRc=0; OpenGLWin32.HWnd=0;}
 	explicit SExposedVideoData(void* Window) {OpenGLWin32.HDc=0; OpenGLWin32.HRc=0; OpenGLWin32.HWnd=Window;}
-
-	struct SD3D9
-	{
-		//! Pointer to the IDirect3D9 interface
-		IDirect3D9* D3D9;
-
-		//! Pointer to the IDirect3DDevice9 interface
-		IDirect3DDevice9* D3DDev9;
-
-		//! Window handle.
-		/** Get with for example HWND h = reinterpret_cast<HWND>(exposedData.D3D9.HWnd) */
-		void* HWnd;
-	};
 
 	struct SOpenGLWin32
 	{
@@ -72,26 +53,11 @@ struct SExposedVideoData
         //! The NSWindow object.
         void* Window;
     };
-	
+
 	struct SOpenGLFB
 	{
 		//! The EGLNativeWindowType object.
-		void* Window;	
-	};
-	
-	struct SOpenGLiOS
-	{
-		//! The EAGLContext object.
-		void* Context;
-			
-		//! The subview UIView object where the drawing happens.
-		void* View;
-		
-		//! The UIViewController object.
-		void* ViewController;
-		
-		//! The UIWindow object.
-        void* Window;
+		void* Window;
 	};
 
 	struct SOGLESAndroid
@@ -102,12 +68,10 @@ struct SExposedVideoData
 
 	union
 	{
-		SD3D9 D3D9;
 		SOpenGLWin32 OpenGLWin32;
 		SOpenGLLinux OpenGLLinux;
 		SOpenGLOSX OpenGLOSX;
 		SOpenGLFB OpenGLFB;
-		SOpenGLiOS OpenGLiOS;
 		SOGLESAndroid OGLESAndroid;
 	};
 };

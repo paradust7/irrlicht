@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __IRR_POINT_2D_H_INCLUDED__
-#define __IRR_POINT_2D_H_INCLUDED__
+#pragma once
 
 #include "irrMath.h"
 #include "dimension2d.h"
@@ -143,7 +142,7 @@ public:
 	bool nearlyParallel( const vector2d<T> & other, const T factor = relativeErrorFactor<T>()) const
 	{
 		// https://eagergames.wordpress.com/2017/04/01/fast-parallel-lines-and-vectors-test/
-		// if a || b then  a.x/a.y = b.x/b.y (similiar triangles)
+		// if a || b then  a.x/a.y = b.x/b.y (similar triangles)
 		// if a || b then either both x are 0 or both y are 0.
 
 		return  equalsRelative( X*other.Y, other.X* Y, factor)
@@ -432,5 +431,4 @@ struct hash<irr::core::vector2d<T> >
 
 }
 
-#endif
 

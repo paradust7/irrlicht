@@ -2,10 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in Irrlicht.h
 
-#ifndef __E_WEGL_EXTENSION_HANDLER_H_INCLUDED__
-#define __E_WEGL_EXTENSION_HANDLER_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
+#pragma once
 
 #if defined(_IRR_COMPILE_WITH_WEBGL1_)	// Note: should also work with WebGL2 once we add that to Irrlicht
 
@@ -179,4 +176,3 @@ namespace video
 }
 
 #endif // defined(_IRR_COMPILE_WITH_WEBGL1_)
-#endif // __E_WEGL1_EXTENSION_HANDLER_H_INCLUDED__

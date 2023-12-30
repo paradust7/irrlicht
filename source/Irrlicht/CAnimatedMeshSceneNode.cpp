@@ -185,10 +185,6 @@ IMesh * CAnimatedMeshSceneNode::getMeshForCurrentFrame()
 	}
 	else
 	{
-#ifndef _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_
-		return 0;
-#else
-
 		// As multiple scene nodes may be sharing the same skinned mesh, we have to
 		// re-animate it every frame to ensure that this node gets the mesh that it needs.
 
@@ -221,7 +217,6 @@ IMesh * CAnimatedMeshSceneNode::getMeshForCurrentFrame()
 		}
 
 		return skinnedMesh;
-#endif
 	}
 }
 
@@ -272,54 +267,23 @@ void CAnimatedMeshSceneNode::render()
 
 	driver->setTransform(video::ETS_WORLD, AbsoluteTransformation);
 
-	// for debug purposes only:
-
-	bool renderMeshes = true;
-	video::SMaterial mat;
-	if (DebugDataVisible && PassCount==1)
+	for (u32 i=0; i<m->getMeshBufferCount(); ++i)
 	{
-		// overwrite half transparency
-		if (DebugDataVisible & scene::EDS_HALF_TRANSPARENCY)
+		const bool transparent = driver->needsTransparentRenderPass(Materials[i]);
+
+		// only render transparent buffer if this is the transparent render pass
+		// and solid only in solid pass
+		if (transparent == isTransparentPass)
 		{
+			scene::IMeshBuffer* mb = m->getMeshBuffer(i);
+			const video::SMaterial& material = ReadOnlyMaterials ? mb->getMaterial() : Materials[i];
+			if (RenderFromIdentity)
+				driver->setTransform(video::ETS_WORLD, core::IdentityMatrix );
+			else if (Mesh->getMeshType() == EAMT_SKINNED)
+				driver->setTransform(video::ETS_WORLD, AbsoluteTransformation * ((SSkinMeshBuffer*)mb)->Transformation);
 
-			for (u32 i=0; i<m->getMeshBufferCount(); ++i)
-			{
-				scene::IMeshBuffer* mb = m->getMeshBuffer(i);
-				mat = ReadOnlyMaterials ? mb->getMaterial() : Materials[i];
-				mat.MaterialType = video::EMT_TRANSPARENT_ADD_COLOR;
-				if (RenderFromIdentity)
-					driver->setTransform(video::ETS_WORLD, core::IdentityMatrix );
-				else if (Mesh->getMeshType() == EAMT_SKINNED)
-					driver->setTransform(video::ETS_WORLD, AbsoluteTransformation * ((SSkinMeshBuffer*)mb)->Transformation);
-
-				driver->setMaterial(mat);
-				driver->drawMeshBuffer(mb);
-			}
-			renderMeshes = false;
-		}
-	}
-
-	// render original meshes
-	if (renderMeshes)
-	{
-		for (u32 i=0; i<m->getMeshBufferCount(); ++i)
-		{
-			const bool transparent = driver->needsTransparentRenderPass(Materials[i]);
-
-			// only render transparent buffer if this is the transparent render pass
-			// and solid only in solid pass
-			if (transparent == isTransparentPass)
-			{
-				scene::IMeshBuffer* mb = m->getMeshBuffer(i);
-				const video::SMaterial& material = ReadOnlyMaterials ? mb->getMaterial() : Materials[i];
-				if (RenderFromIdentity)
-					driver->setTransform(video::ETS_WORLD, core::IdentityMatrix );
-				else if (Mesh->getMeshType() == EAMT_SKINNED)
-					driver->setTransform(video::ETS_WORLD, AbsoluteTransformation * ((SSkinMeshBuffer*)mb)->Transformation);
-
-				driver->setMaterial(material);
-				driver->drawMeshBuffer(mb);
-			}
+			driver->setMaterial(material);
+			driver->drawMeshBuffer(mb);
 		}
 	}
 
@@ -495,11 +459,6 @@ u32 CAnimatedMeshSceneNode::getMaterialCount() const
 //! the corresponding joint, if the mesh in this scene node is a skinned mesh.
 IBoneSceneNode* CAnimatedMeshSceneNode::getJointNode(const c8* jointName)
 {
-#ifndef _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_
-	os::Printer::log("Compiled without _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_", ELL_WARNING);
-	return 0;
-#else
-
 	if (!Mesh || Mesh->getMeshType() != EAMT_SKINNED)
 	{
 		os::Printer::log("No mesh, or mesh not of skinned mesh type", ELL_WARNING);
@@ -525,7 +484,6 @@ IBoneSceneNode* CAnimatedMeshSceneNode::getJointNode(const c8* jointName)
 	}
 
 	return JointChildSceneNodes[number];
-#endif
 }
 
 
@@ -534,11 +492,6 @@ IBoneSceneNode* CAnimatedMeshSceneNode::getJointNode(const c8* jointName)
 //! the corresponding joint, if the mesh in this scene node is a skinned mesh.
 IBoneSceneNode* CAnimatedMeshSceneNode::getJointNode(u32 jointID)
 {
-#ifndef _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_
-	os::Printer::log("Compiled without _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_", ELL_WARNING);
-	return 0;
-#else
-
 	if (!Mesh || Mesh->getMeshType() != EAMT_SKINNED)
 	{
 		os::Printer::log("No mesh, or mesh not of skinned mesh type", ELL_WARNING);
@@ -554,23 +507,17 @@ IBoneSceneNode* CAnimatedMeshSceneNode::getJointNode(u32 jointID)
 	}
 
 	return JointChildSceneNodes[jointID];
-#endif
 }
 
 //! Gets joint count.
 u32 CAnimatedMeshSceneNode::getJointCount() const
 {
-#ifndef _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_
-	return 0;
-#else
-
 	if (!Mesh || Mesh->getMeshType() != EAMT_SKINNED)
 		return 0;
 
 	ISkinnedMesh *skinnedMesh=(ISkinnedMesh*)Mesh;
 
 	return skinnedMesh->getJointCount();
-#endif
 }
 
 
@@ -731,9 +678,6 @@ void CAnimatedMeshSceneNode::setRenderFromIdentity(bool enable)
 //! updates the joint positions of this mesh
 void CAnimatedMeshSceneNode::animateJoints(bool CalculateAbsolutePositions)
 {
-#ifndef _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_
-	return;
-#else
 	if (Mesh && Mesh->getMeshType() == EAMT_SKINNED )
 	{
 		checkJoints();
@@ -805,17 +749,12 @@ void CAnimatedMeshSceneNode::animateJoints(bool CalculateAbsolutePositions)
 			}
 		}
 	}
-#endif
 }
 
 /*!
 */
 void CAnimatedMeshSceneNode::checkJoints()
 {
-#ifndef _IRR_COMPILE_WITH_SKINNED_MESH_SUPPORT_
-	return;
-#else
-
 	if (!Mesh || Mesh->getMeshType() != EAMT_SKINNED)
 		return;
 
@@ -832,7 +771,6 @@ void CAnimatedMeshSceneNode::checkJoints()
 		JointsUsed=true;
 		JointMode=EJUOR_READ;
 	}
-#endif
 }
 
 /*!

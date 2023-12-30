@@ -92,7 +92,7 @@ namespace scene
 		//! Drawn after the solid nodes, before the transparent nodes, the time for drawing shadow volumes
 		ESNRP_SHADOW =64,
 
-		//! Drawn after transparent effect nodes. For custom gui's. Unsorted (in order nodes registered themselves). 
+		//! Drawn after transparent effect nodes. For custom gui's. Unsorted (in order nodes registered themselves).
 		ESNRP_GUI = 128
 
 	};
@@ -130,7 +130,7 @@ namespace scene
 	{
 	public:
 
-		//! Get pointer to an animateable mesh. Loads the file if not loaded already.
+		//! Get pointer to an animatable mesh. Loads the file if not loaded already.
 		/**
 		 * If you want to remove a loaded mesh from the cache again, use removeMesh().
 		 *  Currently there are the following mesh formats supported:
@@ -318,20 +318,10 @@ namespace scene
 		 * \endcode
 		 * If you would like to implement and add your own file format loader to Irrlicht,
 		 * see addExternalMeshLoader().
-		 * \param filename: Filename of the mesh to load.
-		 * \param alternativeCacheName: In case you want to have the mesh under another name in the cache (to create real copies)
+		 * \param file File handle of the mesh to load.
 		 * \return Null if failed, otherwise pointer to the mesh.
 		 * This pointer should not be dropped. See IReferenceCounted::drop() for more information.
 		 **/
-		virtual IAnimatedMesh* getMesh(const io::path& filename, const io::path& alternativeCacheName=io::path("")) = 0;
-
-		//! Get pointer to an animateable mesh. Loads the file if not loaded already.
-		/** Works just as getMesh(const char* filename). If you want to
-		remove a loaded mesh from the cache again, use removeMesh().
-		\param file File handle of the mesh to load.
-		\return NULL if failed and pointer to the mesh if successful.
-		This pointer should not be dropped. See
-		IReferenceCounted::drop() for more information. */
 		virtual IAnimatedMesh* getMesh(io::IReadFile* file) = 0;
 
 		//! Get interface to the mesh cache which is shared between all existing scene managers.
@@ -344,16 +334,6 @@ namespace scene
 		/** \return Pointer to the video Driver.
 		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
 		virtual video::IVideoDriver* getVideoDriver() = 0;
-
-		//! Get the active GUIEnvironment
-		/** \return Pointer to the GUIEnvironment
-		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
-		virtual gui::IGUIEnvironment* getGUIEnvironment() = 0;
-
-		//! Get the active FileSystem
-		/** \return Pointer to the FileSystem
-		This pointer should not be dropped. See IReferenceCounted::drop() for more information. */
-		virtual io::IFileSystem* getFileSystem() = 0;
 
 		//! Adds a scene node for rendering an animated mesh model.
 		/** \param mesh: Pointer to the loaded animated mesh to be displayed.
@@ -521,7 +501,7 @@ namespace scene
 		\param pass: Specifies when the node wants to be drawn in relation to the other nodes.
 		For example, if the node is a shadow, it usually wants to be drawn after all other nodes
 		and will use ESNRP_SHADOW for this. See scene::E_SCENE_NODE_RENDER_PASS for details.
-		Note: This is _not_ a bitfield. If you want to register a note for several render passes, then 
+		Note: This is _not_ a bitfield. If you want to register a note for several render passes, then
 		call this function once for each pass.
 		\return scene will be rendered ( passed culling ) */
 		virtual u32 registerNodeForRendering(ISceneNode* node,
@@ -529,7 +509,7 @@ namespace scene
 
 		//! Clear all nodes which are currently registered for rendering
 		/** Usually you don't have to care about this as drawAll will clear nodes
-		after rendering them. But sometimes you might have to manully reset this.
+		after rendering them. But sometimes you might have to manually reset this.
 		For example when you deleted nodes between registering and rendering. */
 		virtual void clearAllRegisteredNodesForRendering() = 0;
 

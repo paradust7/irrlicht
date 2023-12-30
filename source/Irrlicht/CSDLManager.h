@@ -2,12 +2,9 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in Irrlicht.h
 
-#ifndef __C_SDL_MANAGER_H_INCLUDED__
-#define __C_SDL_MANAGER_H_INCLUDED__
+#pragma once
 
-#include "IrrCompileConfig.h"
-
-#if defined(_IRR_COMPILE_WITH_SDL_DEVICE_) && defined(_IRR_COMPILE_WITH_OPENGL_)
+#if defined(_IRR_COMPILE_WITH_SDL_DEVICE_)
 
 #include "IContextManager.h"
 
@@ -49,5 +46,4 @@ namespace video
 }
 }
 
-#endif
 #endif

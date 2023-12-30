@@ -2,9 +2,6 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_OBJ_LOADER_
-
 #include "COBJMeshFileLoader.h"
 #include "IMeshManipulator.h"
 #include "IVideoDriver.h"
@@ -27,23 +24,18 @@ namespace scene
 #endif
 
 //! Constructor
-COBJMeshFileLoader::COBJMeshFileLoader(scene::ISceneManager* smgr, io::IFileSystem* fs)
-: SceneManager(smgr), FileSystem(fs)
+COBJMeshFileLoader::COBJMeshFileLoader(scene::ISceneManager* smgr)
+: SceneManager(smgr)
 {
 	#ifdef _DEBUG
 	setDebugName("COBJMeshFileLoader");
 	#endif
-
-	if (FileSystem)
-		FileSystem->grab();
 }
 
 
 //! destructor
 COBJMeshFileLoader::~COBJMeshFileLoader()
 {
-	if (FileSystem)
-		FileSystem->drop();
 }
 
 
@@ -79,10 +71,9 @@ IAnimatedMesh* COBJMeshFileLoader::createMesh(io::IReadFile* file)
 	u32 smoothingGroup=0;
 
 	const io::path fullName = file->getFileName();
-	const io::path relPath = FileSystem->getFileDir(fullName)+"/";
 
-	c8* buf = new c8[filesize];
-	memset(buf, 0, filesize);
+	c8* buf = new c8[filesize+1]; // plus null-terminator
+	memset(buf, 0, filesize+1);
 	file->read((void*)buf, filesize);
 	const c8* const bufEnd = buf+filesize;
 
@@ -92,7 +83,7 @@ IAnimatedMesh* COBJMeshFileLoader::createMesh(io::IReadFile* file)
 	bool mtlChanged=false;
 	bool useGroups = !SceneManager->getParameters()->getAttributeAsBool(OBJ_LOADER_IGNORE_GROUPS);
 	bool useMaterials = !SceneManager->getParameters()->getAttributeAsBool(OBJ_LOADER_IGNORE_MATERIAL_FILES);
-	irr::u32 lineNr = 1;	// only counts non-empty lines, still useful in debugging to locate errors
+	[[maybe_unused]] irr::u32 lineNr = 1;  // only counts non-empty lines, still useful in debugging to locate errors
 	core::array<int> faceCorners;
 	faceCorners.reallocate(32); // should be large enough
 	const core::stringc TAG_OFF = "off";
@@ -109,7 +100,7 @@ IAnimatedMesh* COBJMeshFileLoader::createMesh(io::IReadFile* file)
 				c8 name[WORD_BUFFER_LENGTH];
 				bufPtr = goAndCopyNextWord(name, bufPtr, WORD_BUFFER_LENGTH, bufEnd);
 #ifdef _IRR_DEBUG_OBJ_LOADER_
-				os::Printer::log("Reading material file",name);
+				os::Printer::log("Ignoring material file",name);
 #endif
 			}
 		}
@@ -229,19 +220,20 @@ IAnimatedMesh* COBJMeshFileLoader::createMesh(io::IReadFile* file)
 				u32 wlength = copyWord(vertexWord, linePtr, WORD_BUFFER_LENGTH, endPtr);
 				// this function will also convert obj's 1-based index to c++'s 0-based index
 				retrieveVertexIndices(vertexWord, Idx, vertexWord+wlength+1, vertexBuffer.size(), textureCoordBuffer.size(), normalsBuffer.size());
-				if ( -1 != Idx[0] && Idx[0] < (irr::s32)vertexBuffer.size() )
+				if ( Idx[0] >= 0 && Idx[0] < (irr::s32)vertexBuffer.size() )
 					v.Pos = vertexBuffer[Idx[0]];
 				else
 				{
-					os::Printer::log("Invalid vertex index in this line:", wordBuffer.c_str(), ELL_ERROR);
+					os::Printer::log("Invalid vertex index in this line", wordBuffer.c_str(), ELL_ERROR);
 					delete [] buf;
+					cleanUp();
 					return 0;
 				}
-				if ( -1 != Idx[1] && Idx[1] < (irr::s32)textureCoordBuffer.size() )
+				if ( Idx[1] >= 0 && Idx[1] < (irr::s32)textureCoordBuffer.size() )
 					v.TCoords = textureCoordBuffer[Idx[1]];
 				else
 					v.TCoords.set(0.0f,0.0f);
-				if ( -1 != Idx[2] && Idx[2] < (irr::s32)normalsBuffer.size() )
+				if ( Idx[2] >= 0 && Idx[2] < (irr::s32)normalsBuffer.size() )
 					v.Normal = normalsBuffer[Idx[2]];
 				else
 				{
@@ -266,6 +258,14 @@ IAnimatedMesh* COBJMeshFileLoader::createMesh(io::IReadFile* file)
 
 				// go to next vertex
 				linePtr = goNextWord(linePtr, endPtr);
+			}
+
+			if (faceCorners.size() < 3)
+			{
+				os::Printer::log("Too few vertices in this line", wordBuffer.c_str(), ELL_ERROR);
+				delete [] buf;
+				cleanUp();
+				return 0;
 			}
 
 			// triangulate the face
@@ -420,7 +420,7 @@ COBJMeshFileLoader::SObjMtl* COBJMeshFileLoader::findMtl(const core::stringc& mt
 		Materials.getLast()->Group = grpName;
 		return Materials.getLast();
 	}
-	// we found a new group for a non-existant material
+	// we found a new group for a non-existent material
 	else if (grpName.size())
 	{
 		Materials.push_back(new SObjMtl(*Materials[0]));
@@ -612,6 +612,3 @@ void COBJMeshFileLoader::cleanUp()
 
 } // end namespace scene
 } // end namespace irr
-
-#endif // _IRR_COMPILE_WITH_OBJ_LOADER_
-

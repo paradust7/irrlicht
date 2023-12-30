@@ -183,24 +183,6 @@ public:
 		return Data;
 	}
 
-	//! Lock function. Use this to get a pointer to the image data.
-	/** Use getData instead.
-	\return Pointer to the image data. What type of data is pointed to
-	depends on the color format of the image. For example if the color
-	format is ECF_A8R8G8B8, it is of u32. Be sure to call unlock() after
-	you don't need the pointer any more. */
-	_IRR_DEPRECATED_ void* lock()
-	{
-		return getData();
-	}
-
-	//! Unlock function.
-	/** Should be called after the pointer received by lock() is not
-	needed anymore. */
-	_IRR_DEPRECATED_ void unlock()
-	{
-	}
-
 	//! Get the mipmap size for this image for a certain mipmap level
 	/** level 0 will be full image size. Every further level is half the size.
 		Doesn't care if the image actually has mipmaps, just which size would be needed. */
@@ -329,6 +311,12 @@ public:
 	//! Sets a pixel
 	virtual void setPixel(u32 x, u32 y, const SColor &color, bool blend = false ) = 0;
 
+	//! Copies this surface into another, if it has the exact same size and format.
+	/**	NOTE: mipmaps are ignored
+	\return True if it was copied, false otherwise.
+	*/
+	virtual bool copyToNoScaling(void *target, u32 width, u32 height, ECOLOR_FORMAT format=ECF_A8R8G8B8, u32 pitch=0) const = 0;
+
 	//! Copies the image into the target, scaling the image to fit
 	/**	NOTE: mipmaps are ignored */
 	virtual void copyToScaling(void* target, u32 width, u32 height, ECOLOR_FORMAT format=ECF_A8R8G8B8, u32 pitch=0) =0;
@@ -360,19 +348,6 @@ public:
 
 	//! fills the surface with given color
 	virtual void fill(const SColor &color) =0;
-
-	//! Inform whether the image is compressed
-	_IRR_DEPRECATED_ bool isCompressed() const
-	{
-		return IImage::isCompressedFormat(Format);
-	}
-
-	//! Check whether the image has MipMaps
-	/** \return True if image has MipMaps, else false. */
-	_IRR_DEPRECATED_ bool hasMipMaps() const
-	{
-		return (getMipMapsData() != 0);
-	}
 
 	//! get the amount of Bits per Pixel of the given color format
 	static u32 getBitsPerPixelFromFormat(const ECOLOR_FORMAT format)

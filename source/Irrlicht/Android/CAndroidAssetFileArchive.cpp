@@ -2,9 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#include "IrrCompileConfig.h"
 
-#ifdef   _IRR_COMPILE_ANDROID_ASSET_READER_
 
 #include "CAndroidAssetReader.h"
 
@@ -66,29 +64,29 @@ IReadFile* CAndroidAssetFileArchive::createAndOpenFile(u32 index)
 	const io::path& filename(getFullFileName(index));
 	if ( filename.empty() )
 		return 0;
-	
+
     return createAndOpenFile(filename);
 }
 
 void CAndroidAssetFileArchive::addDirectoryToFileList(const io::path &dirname_)
 {
 	io::path dirname(dirname_);
-	fschar_t lastChar = dirname.lastChar();	
+	fschar_t lastChar = dirname.lastChar();
 	if ( lastChar == '/' || lastChar == '\\' )
 		dirname.erase(dirname.size()-1);
-	
+
 	// os::Printer::log("addDirectoryToFileList:", dirname.c_str(), ELL_DEBUG);
 	if  (findFile(dirname, true) >= 0 )
 		return;	// was already added
-	
+
 	AAssetDir *dir = AAssetManager_openDir(AssetManager, core::stringc(dirname).c_str());
 	if(!dir)
 		return;
 
-	// add directory itself 
+	// add directory itself
 	addItem(dirname, 0, 0, /*isDir*/true, getFileCount());
-	
-	// add all files in folder. 
+
+	// add all files in folder.
 	// Note: AAssetDir_getNextFileName does not return directory names (neither does any other NDK function)
 	while(const char *filename = AAssetDir_getNextFileName(dir))
 	{
@@ -107,4 +105,3 @@ void CAndroidAssetFileArchive::addDirectoryToFileList(const io::path &dirname_)
 } // end namespace io
 } // end namespace irr
 
-#endif //  _IRR_COMPILE_ANDROID_ASSET_READER_

@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_VIDEO_NULL_H_INCLUDED__
-#define __C_VIDEO_NULL_H_INCLUDED__
+#pragma once
 
 #include "IVideoDriver.h"
 #include "IFileSystem.h"
@@ -80,14 +79,8 @@ namespace video
 		//! loads a Texture
 		ITexture* getTexture(io::IReadFile* file) override;
 
-		//! Returns a texture by index
-		ITexture* getTextureByIndex(u32 index) override;
-
 		//! Returns amount of textures currently loaded
 		u32 getTextureCount() const override;
-
-		//! Renames a texture
-		void renameTexture(ITexture* texture, const io::path& newName) override;
 
 		ITexture* addTexture(const core::dimension2d<u32>& size, const io::path& name, ECOLOR_FORMAT format = ECF_A8R8G8B8) override;
 
@@ -126,9 +119,8 @@ namespace video
 		virtual void draw3DLine(const core::vector3df& start,
 			const core::vector3df& end, SColor color = SColor(255,255,255,255)) override;
 
-		//! Draws a 3d triangle.
-		virtual void draw3DTriangle(const core::triangle3df& triangle,
-			SColor color = SColor(255,255,255,255)) override;
+		[[deprecated]] virtual void draw3DTriangle(const core::triangle3df& triangle,
+			SColor color = SColor(255,255,255,255)) {}
 
 		//! Draws a 3d axis aligned box.
 		virtual void draw3DBox(const core::aabbox3d<f32>& box,
@@ -154,14 +146,14 @@ namespace video
 		Note that the alpha component is used: If alpha is other than 255, the image will be transparent.
 		\param useAlphaChannelOfTexture: If true, the alpha channel of the texture is
 		used to draw the image. */
-		virtual void draw2DImageBatch(const video::ITexture* texture,
+		[[deprecated]] virtual void draw2DImageBatch(const video::ITexture* texture,
 				const core::position2d<s32>& pos,
 				const core::array<core::rect<s32> >& sourceRects,
 				const core::array<s32>& indices,
 				s32 kerningWidth = 0,
 				const core::rect<s32>* clipRect = 0,
 				SColor color=SColor(255,255,255,255),
-				bool useAlphaChannelOfTexture=false) override;
+				bool useAlphaChannelOfTexture=false) {}
 
 		//! Draws a set of 2d images, using a color and the alpha channel of the texture.
 		/** All drawings are clipped against clipRect (if != 0).
@@ -205,7 +197,7 @@ namespace video
 			const core::rect<s32>* clip = 0) override;
 
 		//! Draws the outline of a 2d rectangle
-		void draw2DRectangleOutline(const core::recti& pos, SColor color=SColor(255,255,255,255)) override;
+		[[deprecated]] virtual void draw2DRectangleOutline(const core::recti& pos, SColor color=SColor(255,255,255,255)) {}
 
 		//! Draws a 2d line.
 		virtual void draw2DLine(const core::position2d<s32>& start,
@@ -213,11 +205,11 @@ namespace video
 					SColor color=SColor(255,255,255,255)) override;
 
 		//! Draws a pixel
-		void drawPixel(u32 x, u32 y, const SColor & color) override;
+		[[deprecated]] virtual void drawPixel(u32 x, u32 y, const SColor & color) {}
 
 		//! Draws a non filled concyclic reqular 2d polygon.
-		virtual void draw2DPolygon(core::position2d<s32> center,
-			f32 radius, video::SColor Color, s32 vertexCount) override;
+		[[deprecated]] virtual void draw2DPolygon(core::position2d<s32> center,
+			f32 radius, video::SColor Color, s32 vertexCount) {}
 
 		virtual void setFog(SColor color=SColor(0,255,255,255),
 				E_FOG_TYPE fogType=EFT_FOG_LINEAR,
@@ -268,17 +260,17 @@ namespace video
 		//! Draws a shadow volume into the stencil buffer. To draw a stencil shadow, do
 		//! this: First, draw all geometry. Then use this method, to draw the shadow
 		//! volume. Then, use IVideoDriver::drawStencilShadow() to visualize the shadow.
-		virtual void drawStencilShadowVolume(const core::array<core::vector3df>& triangles,
-			bool zfail=true, u32 debugDataVisible=0) override;
+		[[deprecated]] virtual void drawStencilShadowVolume(const core::array<core::vector3df>& triangles,
+			bool zfail=true, u32 debugDataVisible=0) {}
 
 		//! Fills the stencil shadow with color. After the shadow volume has been drawn
 		//! into the stencil buffer using IVideoDriver::drawStencilShadowVolume(), use this
 		//! to draw the color of the shadow.
-		virtual void drawStencilShadow(bool clearStencilBuffer=false,
+		[[deprecated]] virtual void drawStencilShadow(bool clearStencilBuffer=false,
 			video::SColor leftUpEdge = video::SColor(0,0,0,0),
 			video::SColor rightUpEdge = video::SColor(0,0,0,0),
 			video::SColor leftDownEdge = video::SColor(0,0,0,0),
-			video::SColor rightDownEdge = video::SColor(0,0,0,0)) override;
+			video::SColor rightDownEdge = video::SColor(0,0,0,0)) {}
 
 
 		//! Removes a texture from the texture cache and deletes it, freeing lot of
@@ -298,11 +290,11 @@ namespace video
 				const io::path& name, const ECOLOR_FORMAT format) override;
 
 		//! Creates an 1bit alpha channel of the texture based of an color key.
-		void makeColorKeyTexture(video::ITexture* texture, video::SColor color, bool zeroTexels) const override;
+		void makeColorKeyTexture(video::ITexture* texture, video::SColor color) const override;
 
 		//! Creates an 1bit alpha channel of the texture based of an color key position.
-		virtual void makeColorKeyTexture(video::ITexture* texture, core::position2d<s32> colorKeyPixelPos,
-			bool zeroTexels) const override;
+		virtual void makeColorKeyTexture(video::ITexture* texture,
+				core::position2d<s32> colorKeyPixelPos) const override;
 
 		//! Returns the maximum amount of primitives (mostly vertices) which
 		//! the device is able to render with one drawIndexedTriangleList
@@ -315,9 +307,9 @@ namespace video
 		//! Returns if a texture creation flag is enabled or disabled.
 		bool getTextureCreationFlag(E_TEXTURE_CREATION_FLAG flag) const override;
 
-		core::array<IImage*> createImagesFromFile(const io::path& filename, E_TEXTURE_TYPE* type = 0) override;
+		IImage *createImageFromFile(const io::path& filename) override;
 
-		core::array<IImage*> createImagesFromFile(io::IReadFile* file, E_TEXTURE_TYPE* type = 0) override;
+		IImage *createImageFromFile(io::IReadFile* file) override;
 
 		//! Creates a software image from a byte array.
 		/** \param useForeignMemory: If true, the image will use the data pointer
@@ -329,14 +321,6 @@ namespace video
 
 		//! Creates an empty software image.
 		IImage* createImage(ECOLOR_FORMAT format, const core::dimension2d<u32>& size) override;
-
-		//! Creates a software image from another image.
-		IImage* createImage(ECOLOR_FORMAT format, IImage *imageToCopy) override;
-
-		//! Creates a software image from part of another image.
-		virtual IImage* createImage(IImage* imageToCopy,
-				const core::position2d<s32>& pos,
-				const core::dimension2d<u32>& size) override;
 
 		//! Creates a software image from part of a texture.
 		virtual IImage* createImage(ITexture* texture,
@@ -588,7 +572,7 @@ namespace video
 		bool writeImageToFile(IImage* image, io::IWriteFile * file, u32 param = 0) override;
 
 		//! Sets the name of a material renderer.
-		void setMaterialRendererName(s32 idx, const char* name) override;
+		void setMaterialRendererName(u32 idx, const char* name) override;
 
 		//! Swap the material renderers used for certain id's
 		void swapMaterialRenderers(u32 idx1, u32 idx2, bool swapNames) override;
@@ -666,13 +650,15 @@ namespace video
 
 		//! adds a surface, not loaded or created by the Irrlicht Engine
 		void addTexture(ITexture* surface);
-		
+
 		virtual ITexture* createDeviceDependentTexture(const io::path& name, IImage* image);
 
 		virtual ITexture* createDeviceDependentTextureCubemap(const io::path& name, const core::array<IImage*>& image);
 
 		//! checks triangle count and print warning if wrong
 		bool checkPrimitiveCount(u32 prmcnt) const;
+
+		bool checkImage(IImage *image) const;
 
 		bool checkImage(const core::array<IImage*>& image) const;
 
@@ -840,6 +826,3 @@ namespace video
 
 } // end namespace video
 } // end namespace irr
-
-
-#endif

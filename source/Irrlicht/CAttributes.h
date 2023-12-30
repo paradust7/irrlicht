@@ -2,10 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_ATTRIBUTES_H_INCLUDED__
-#define __C_ATTRIBUTES_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
+#pragma once
 
 #include "IAttributes.h"
 #include "IAttribute.h"
@@ -148,6 +145,4 @@ protected:
 
 } // end namespace io
 } // end namespace irr
-
-#endif
 

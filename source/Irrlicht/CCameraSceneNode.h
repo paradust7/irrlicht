@@ -2,8 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_CAMERA_SCENE_NODE_H_INCLUDED__
-#define __C_CAMERA_SCENE_NODE_H_INCLUDED__
+#pragma once
 
 #include "ICameraSceneNode.h"
 #include "SViewFrustum.h"
@@ -162,12 +161,7 @@ namespace scene
 
 		bool InputReceiverEnabled;
 		bool TargetAndRotationAreBound;
-
-		bool HasD3DStyleProjectionMatrix;	// true: projection from 0 to w; false: -w to w
 	};
 
 } // end namespace
 } // end namespace
-
-#endif
-

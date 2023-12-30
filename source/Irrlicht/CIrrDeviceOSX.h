@@ -3,10 +3,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in Irrlicht.h
 
-#ifndef __C_IRR_DEVICE_OSX_H_INCLUDED__
-#define __C_IRR_DEVICE_OSX_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
+#pragma once
 
 #ifdef _IRR_COMPILE_WITH_OSX_DEVICE_
 
@@ -25,7 +22,7 @@ namespace irr
     class CIrrDeviceMacOSX;
 }
 
-@interface CIrrDelegateOSX : NSObject
+@interface CIrrDelegateOSX : NSObject <NSApplicationDelegate, NSWindowDelegate>
 
 - (id)initWithDevice:(irr::CIrrDeviceMacOSX*)device;
 - (void)terminate:(id)sender;
@@ -250,5 +247,3 @@ namespace irr
 } // end namespace irr
 
 #endif // _IRR_COMPILE_WITH_OSX_DEVICE_
-#endif // __C_IRR_DEVICE_MACOSX_H_INCLUDED__
-

@@ -6,9 +6,6 @@
 // File format designed by Mark Sibly for the Blitz3D engine and has been
 // declared public domain
 
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_B3D_LOADER_
-
 #include "CB3DMeshFileLoader.h"
 
 #include "IVideoDriver.h"
@@ -277,7 +274,14 @@ bool CB3DMeshFileLoader::readChunkMESH(CSkinnedMesh::SJoint *inJoint)
 		{
 			scene::SSkinMeshBuffer *meshBuffer = AnimatedMesh->addMeshBuffer();
 
-			if (brushID!=-1)
+			if (brushID == -1)
+			{ /* ok */ }
+			else if (brushID < 0 || (u32)brushID >= Materials.size())
+			{
+				os::Printer::log("Illegal brush ID found", B3DFile->getFileName(), ELL_ERROR);
+				return false;
+			}
+			else
 			{
 				meshBuffer->Material=Materials[brushID].Material;
 			}
@@ -357,7 +361,8 @@ bool CB3DMeshFileLoader::readChunkVRTS(CSkinnedMesh::SJoint *inJoint)
 	tex_coord_set_size = os::Byteswap::byteswap(tex_coord_set_size);
 #endif
 
-	if (tex_coord_sets >= max_tex_coords || tex_coord_set_size >= 4) // Something is wrong
+	if (tex_coord_sets < 0 || tex_coord_set_size < 0 ||
+		tex_coord_sets >= max_tex_coords || tex_coord_set_size >= 4) // Something is wrong
 	{
 		os::Printer::log("tex_coord_sets or tex_coord_set_size too big", B3DFile->getFileName(), ELL_ERROR);
 		return false;
@@ -461,13 +466,18 @@ bool CB3DMeshFileLoader::readChunkTRIS(scene::SSkinMeshBuffer *meshBuffer, u32 m
 
 	SB3dMaterial *B3dMaterial;
 
-	if (triangle_brush_id != -1)
+	if (triangle_brush_id == -1)
+		B3dMaterial = 0;
+	else if (triangle_brush_id < 0 || (u32)triangle_brush_id >= Materials.size())
+	{
+		os::Printer::log("Illegal material index found", B3DFile->getFileName(), ELL_ERROR);
+		return false;
+	}
+	else
 	{
 		B3dMaterial = &Materials[triangle_brush_id];
 		meshBuffer->Material = B3dMaterial->Material;
 	}
-	else
-		B3dMaterial = 0;
 
 	const s32 memoryNeeded = B3dStack.getLast().length / sizeof(s32);
 	meshBuffer->Indices.reallocate(memoryNeeded + meshBuffer->Indices.size() + 1);
@@ -585,6 +595,12 @@ bool CB3DMeshFileLoader::readChunkBONE(CSkinnedMesh::SJoint *inJoint)
 			strength = os::Byteswap::byteswap(strength);
 #endif
 			globalVertexID += VerticesStart;
+
+			if (globalVertexID >= AnimatedVertices_VertexID.size())
+			{
+				os::Printer::log("Illegal vertex index found", B3DFile->getFileName(), ELL_ERROR);
+				return false;
+			}
 
 			if (AnimatedVertices_VertexID[globalVertexID]==-1)
 			{
@@ -946,19 +962,8 @@ bool CB3DMeshFileLoader::readChunkBRUS()
 		//Two textures:
 		if (B3dMaterial.Textures[1])
 		{
-			if (B3dMaterial.alpha==1.f)
-			{
-				if (B3dMaterial.Textures[1]->Blend == 5) //(Multiply 2)
-					B3dMaterial.Material.MaterialType = video::EMT_LIGHTMAP_M2;
-				else
-					B3dMaterial.Material.MaterialType = video::EMT_LIGHTMAP;
-				B3dMaterial.Material.Lighting = false;
-			}
-			else
-			{
-				B3dMaterial.Material.MaterialType = video::EMT_TRANSPARENT_VERTEX_ALPHA;
-				B3dMaterial.Material.ZWriteEnable = video::EZW_OFF;
-			}
+			B3dMaterial.Material.MaterialType = video::EMT_TRANSPARENT_VERTEX_ALPHA;
+			B3dMaterial.Material.ZWriteEnable = video::EZW_OFF;
 		}
 		else if (B3dMaterial.Textures[0]) //One texture:
 		{
@@ -970,10 +975,6 @@ bool CB3DMeshFileLoader::readChunkBRUS()
 			}
 			else if (B3dMaterial.Textures[0]->Flags & 0x4) //(Masked)
 				B3dMaterial.Material.MaterialType = video::EMT_TRANSPARENT_ALPHA_CHANNEL_REF; // TODO: create color key texture
-			else if (B3dMaterial.Textures[0]->Flags & 0x40)
-				B3dMaterial.Material.MaterialType = video::EMT_SPHERE_MAP;
-			else if (B3dMaterial.Textures[0]->Flags & 0x80)
-				B3dMaterial.Material.MaterialType = video::EMT_SPHERE_MAP; // TODO: Should be cube map
 			else if (B3dMaterial.alpha == 1.f)
 				B3dMaterial.Material.MaterialType = video::EMT_SOLID;
 			else
@@ -1033,10 +1034,11 @@ bool CB3DMeshFileLoader::readChunkBRUS()
 void CB3DMeshFileLoader::readString(core::stringc& newstring)
 {
 	newstring="";
-	while (B3DFile->getPos() <= B3DFile->getSize())
+	while (true)
 	{
 		c8 character;
-		B3DFile->read(&character, sizeof(character));
+		if (B3DFile->read(&character, sizeof(character)) == 0)
+			return; // eof
 		if (character==0)
 			return;
 		newstring.append(character);
@@ -1055,7 +1057,3 @@ void CB3DMeshFileLoader::readFloats(f32* vec, u32 count)
 
 } // end namespace scene
 } // end namespace irr
-
-
-#endif // _IRR_COMPILE_WITH_B3D_LOADER_
-

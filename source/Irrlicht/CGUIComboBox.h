@@ -2,11 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_GUI_COMBO_BOX_H_INCLUDED__
-#define __C_GUI_COMBO_BOX_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
-#ifdef _IRR_COMPILE_WITH_GUI_
+#pragma once
 
 #include "IGUIComboBox.h"
 #include "IGUIStaticText.h"
@@ -59,6 +55,10 @@ namespace gui
 		//! sets the selected item. Set this to -1 if no item should be selected
 		void setSelected(s32 idx) override;
 
+		//! Sets the selected item and emits a change event.
+		/** Set this to -1 if no item should be selected */
+		void setAndSendSelected(s32 idx) override;
+
 		//! sets the text alignment of the text part
 		void setTextAlignment(EGUI_ALIGNMENT horizontal, EGUI_ALIGNMENT vertical) override;
 
@@ -106,8 +106,3 @@ namespace gui
 
 } // end namespace gui
 } // end namespace irr
-
-#endif // _IRR_COMPILE_WITH_GUI_
-
-#endif // __C_GUI_COMBO_BOX_H_INCLUDED__
-

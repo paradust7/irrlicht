@@ -24,14 +24,10 @@ namespace irr
 		//! A device native to Mac OSX
 		/** This device uses Apple's Cocoa API and works in Mac OSX 10.2 and above. */
 		EIDT_OSX,
-        
-        //! A device native to the iOS
-		/** This device should be used with the OpenGL-ES driver. */
-		EIDT_IOS,
 
 		//! A device which uses Simple DirectMedia Layer
 		/** The SDL device works under all platforms supported by SDL but first must be compiled
-		in by defining the _IRR_COMPILE_WITH_SDL_DEVICE_ macro in IrrCompileConfig.h */
+		in by setting the USE_SDL2 CMake option to ON */
 		EIDT_SDL,
 
 		//! This selection allows Irrlicht to choose the best device from the ones available.
@@ -40,12 +36,12 @@ namespace irr
 		will be tried. This ensures that Irrlicht will run even if your platform is unsupported,
 		although it may not be able to render anything. */
 		EIDT_BEST,
-		
+
 		//! A device for Android platforms
 		/** Best used with embedded devices and mobile systems.
 		Does not need X11 or other graphical subsystems.
 		May support hw-acceleration via OpenGL-ES */
-		EIDT_ANDROID,		
+		EIDT_ANDROID,
 	};
 
 } // end namespace irr

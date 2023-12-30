@@ -2,12 +2,7 @@
 // This file is part of the "Irrlicht Engine".
 // For conditions of distribution and use, see copyright notice in irrlicht.h
 
-#ifndef __C_OGLCORE_TEXTURE_H_INCLUDED__
-#define __C_OGLCORE_TEXTURE_H_INCLUDED__
-
-#include "IrrCompileConfig.h"
-
-#if defined(_IRR_COMPILE_WITH_OPENGL_) || defined(_IRR_COMPILE_WITH_OGLES1_) || defined(_IRR_COMPILE_WITH_OGLES2_)
+#pragma once
 
 #include "irrArray.h"
 #include "SMaterialLayer.h"
@@ -34,8 +29,8 @@ public:
 	struct SStatesCache
 	{
 		SStatesCache() : WrapU(ETC_REPEAT), WrapV(ETC_REPEAT), WrapW(ETC_REPEAT),
-			LODBias(0), AnisotropicFilter(0), BilinearFilter(false), TrilinearFilter(false),
-			MipMapStatus(false), IsCached(false)
+			LODBias(0), AnisotropicFilter(0), MinFilter(video::ETMINF_NEAREST_MIPMAP_NEAREST),
+			MagFilter(video::ETMAGF_NEAREST), MipMapStatus(false), IsCached(false)
 		{
 		}
 
@@ -44,8 +39,8 @@ public:
 		u8 WrapW;
 		s8 LODBias;
 		u8 AnisotropicFilter;
-		bool BilinearFilter;
-		bool TrilinearFilter;
+		video::E_TEXTURE_MIN_FILTER MinFilter;
+		video::E_TEXTURE_MAG_FILTER MagFilter;
 		bool MipMapStatus;
 		bool IsCached;
 	};
@@ -434,9 +429,6 @@ public:
 		else
 		{
 #ifdef IRR_OPENGL_HAS_glGenerateMipmap
-	#if !defined(IRR_COMPILE_GLES2_COMMON)
-			glEnable(GL_TEXTURE_2D);	// Hack some ATI cards need this glEnable according to https://www.khronos.org/opengl/wiki/Common_Mistakes
-	#endif
 			Driver->irrGlGenerateMipmap(TextureType);
 #endif
 		}
@@ -668,6 +660,3 @@ protected:
 
 }
 }
-
-#endif
-#endif

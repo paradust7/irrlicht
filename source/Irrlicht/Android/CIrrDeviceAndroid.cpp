@@ -5,8 +5,6 @@
 
 #include "CIrrDeviceAndroid.h"
 
-#ifdef _IRR_COMPILE_WITH_ANDROID_DEVICE_
-
 #include "os.h"
 #include "CFileSystem.h"
 #include "CAndroidAssetReader.h"
@@ -108,7 +106,7 @@ bool CIrrDeviceAndroid::run()
 	s32 Events = 0;
 	android_poll_source* Source = 0;
 
-	while ((id = ALooper_pollAll(((Focused && !Paused) || !Initialized) ? 0 : -1, 0, &Events, (void**)&Source)) >= 0)
+	while ((id = ALooper_pollAll(0, 0, &Events, (void**)&Source)) >= 0)
 	{
 		if(Source)
 			Source->process(Android, Source);
@@ -535,11 +533,7 @@ void CIrrDeviceAndroid::createDriver()
 	case video::EDT_NULL:
 		VideoDriver = video::createNullDriver(FileSystem, CreationParams.WindowSize);
 		break;
-	case video::EDT_SOFTWARE:
-	case video::EDT_BURNINGSVIDEO:
 	case video::EDT_OPENGL:
-	case video::DEPRECATED_EDT_DIRECT3D8_NO_LONGER_EXISTS:
-	case video::EDT_DIRECT3D9:
 		os::Printer::log("This driver is not available in Android. Try OpenGL ES 1.0 or ES 2.0.", ELL_ERROR);
 		break;
 	default:
@@ -862,5 +856,3 @@ bool CIrrDeviceAndroid::isGyroscopeAvailable()
 }
 
 } // end namespace irr
-
-#endif
