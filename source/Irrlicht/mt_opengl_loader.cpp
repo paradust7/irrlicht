@@ -758,6 +758,9 @@ void OpenGLProcedures::LoadAllProcedures(irr::video::IContextManager *cmgr)
 	if (!NamedBufferPageCommitment) NamedBufferPageCommitment = (PFNGLNAMEDBUFFERPAGECOMMITMENTPROC_MT)cmgr->getProcAddress("glNamedBufferPageCommitmentARB");
 	if (!TexPageCommitment) TexPageCommitment = (PFNGLTEXPAGECOMMITMENTPROC_MT)cmgr->getProcAddress("glTexPageCommitmentARB");
 
+// On Emscripten, this causes a GL error which makes
+// testGLError() assert on debug build.
+#ifndef __EMSCRIPTEN__
 	// OpenGL 3 way to enumerate extensions
 	GLint ext_count = 0;
 	GetIntegerv(NUM_EXTENSIONS, &ext_count);
@@ -769,6 +772,7 @@ void OpenGLProcedures::LoadAllProcedures(irr::video::IContextManager *cmgr)
 	}
 	if (!extensions.empty())
 		return;
+#endif
 
 	// OpenGL 2 / ES 2 way to enumerate extensions
 	auto ext_str = GetString(EXTENSIONS);
