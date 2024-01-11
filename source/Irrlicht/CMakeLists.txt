@@ -4,6 +4,7 @@ endif()
 
 option(BUILD_SHARED_LIBS "Build shared library" TRUE)
 option(USE_SDL2 "Use the SDL2 backend" ${DEFAULT_SDL2})
+option(ENABLE_OPENXR "Enable the OpenXR backend" TRUE)
 
 # Compiler flags
 
@@ -227,6 +228,10 @@ if(ENABLE_WEBGL1)
 	add_definitions(-D_IRR_COMPILE_WITH_WEBGL1_)
 endif()
 
+if(ENABLE_OPENXR)
+	add_definitions(-D_IRR_COMPILE_WITH_XR_DEVICE_)
+endif()
+
 # Misc
 
 include(TestBigEndian)
@@ -275,6 +280,29 @@ if(USE_SDL2)
 	message(STATUS "Found SDL2: ${SDL2_LIBRARIES}")
 endif()
 
+if(ENABLE_OPENXR)
+	if(NOT USE_SDL2)
+		message(FATAL_ERROR "OpenXR driver requires SDL2")
+	endif()
+	find_package(OpenXR REQUIRED)
+	message(STATUS "Found OpenXR")
+
+	if(WIN32)
+		# WinAPI is automatically available.
+	elseif(ENABLE_GLES1 OR ENABLE_GLES2)
+		# EGL is already available
+	elseif(APPLE)
+		message(FATAL_ERROR "OpenXR not supported on MacOS X / iOS")
+	elseif(ANDROID)
+		message(FATAL_ERROR "OpenXR not supported on android")
+	else()
+		find_package(X11 REQUIRED)
+		set(OPENXR_EXTRA_INCLUDE ${X11_INCLUDE_DIR})
+		set(OPENXR_EXTRA_LIBS ${X11_X11_LIB})
+	endif()
+
+endif()
+
 # Platform-specific libs
 
 if(ANDROID)
@@ -304,9 +332,12 @@ set(link_includes
 	${OPENGL_INCLUDE_DIR}
 	${OPENGLES2_INCLUDE_DIR}
 	${EGL_INCLUDE_DIR}
+	${OpenXR_INCLUDE_DIRS}
 
 	"$<$<PLATFORM_ID:Android>:${ANDROID_NDK}/sources/android/native_app_glue>"
 	"$<$<BOOL:${USE_X11}>:${X11_INCLUDE_DIR}>"
+
+	"${OPENXR_EXTRA_INCLUDE}"
 )
 
 set(link_libs
@@ -319,6 +350,9 @@ set(link_libs
 	${OPENGLES_LIBRARY}
 	${OPENGLES2_LIBRARIES}
 	${EGL_LIBRARY}
+	OpenXR::headers
+	OpenXR::openxr_loader
+	${OPENXR_EXTRA_LIBS}
 
 	"$<$<PLATFORM_ID:Android>:-landroid -llog>"
 	${COCOA_LIB}
@@ -445,6 +479,7 @@ add_library(IRRIOOBJ OBJECT
 
 add_library(IRROTHEROBJ OBJECT
 	CIrrDeviceSDL.cpp
+	CIrrDeviceXR.cpp
 	CIrrDeviceLinux.cpp
 	CIrrDeviceStub.cpp
 	CIrrDeviceWin32.cpp
@@ -456,6 +491,12 @@ add_library(IRROTHEROBJ OBJECT
 
 if(ENABLE_OPENGL3)
 	target_compile_definitions(IRROTHEROBJ PRIVATE ENABLE_OPENGL3)
+endif()
+
+if(ENABLE_OPENXR)
+	target_sources(IRROTHEROBJ PRIVATE
+		OpenXR/COpenXRConnector.cpp
+	)
 endif()
 
 if(ANDROID)
