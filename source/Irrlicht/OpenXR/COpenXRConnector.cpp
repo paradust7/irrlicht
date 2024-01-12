@@ -5,6 +5,7 @@
 #include "os.h"
 #include "IOpenXRConnector.h"
 #include <unordered_set>
+#include <SDL_video.h>
 
 // See COpenXRConnector::createSession() for why this is needed.
 #if defined(WIN32)
@@ -58,20 +59,34 @@ class COpenXRConnector : public IOpenXRConnector {
 		bool loadExtensions();
 		bool createInstance();
 		bool getSystem();
+		bool getViewConfigs();
+		bool setupStereoView();
+		bool verifyGraphics();
 		bool createSession();
 
 		bool check(XrResult result, const char* func);
 
 		video::IVideoDriver* VideoDriver;
 
+		// Supported extensions
 		std::vector<XrExtensionProperties> Extensions;
 		std::unordered_set<std::string> ExtensionNames;
 
+		// Instance
 		XrInstance Instance = XR_NULL_HANDLE;
 		XrInstanceProperties InstanceProperties;
 
+		// System
 		XrSystemId SystemId = XR_NULL_SYSTEM_ID;
 		XrSystemProperties SystemProps;
+
+		// Supported View Configurations (mono, stereo, etc)
+		std::vector<XrViewConfigurationType> ViewConfigs;
+		std::vector<XrViewConfigurationProperties> ViewConfigProperties;
+
+		// Parameters for the view config we're using
+		// For stereo, this has left and right eyes
+		std::vector<XrViewConfigurationView> ActiveViews;
 
 		XrSession Session = XR_NULL_HANDLE;
 
@@ -93,26 +108,56 @@ COpenXRConnector::~COpenXRConnector()
 }
 
 bool COpenXRConnector::Init() {
-	if (!loadExtensions())
-		return false;
-	if (!createInstance())
-		return false;
-	if (!getSystem())
-		return false;
+	if (!loadExtensions()) return false;
+	if (!createInstance()) return false;
+	if (!getSystem()) return false;
+	if (!getViewConfigs()) return false;
+	if (!setupStereoView()) return false;
+	if (!verifyGraphics()) return false;
+
 	//if (!createSession())
 	//	return false;
 	return true;
 }
 
+bool COpenXRConnector::loadExtensions()
+{
+	XrResult result;
+	uint32_t ext_count = 0;
+	result = xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count, NULL);
+	if (!check(result, "xrEnumerateInstanceExtensionProperties"))
+		return false;
+
+	Extensions.resize(ext_count, { XR_TYPE_EXTENSION_PROPERTIES, nullptr });
+	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, Extensions.data());
+	if (!check(result, "xrEnumerateInstanceExtensionProperties"))
+		return false;
+
+	for (const auto &extension : Extensions) {
+		ExtensionNames.emplace(extension.extensionName);
+	}
+	return true;
+}
+
 bool COpenXRConnector::createInstance()
 {
+	std::vector<const char*> extensionsToEnable;
+
+#ifdef XR_USE_GRAPHICS_API_OPENGL
 	if (!ExtensionNames.count(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)) {
-		os::Printer::log("OpenXR does not support OpenGL extension", ELL_ERROR);
+		os::Printer::log("OpenXR runtime does not support OpenGL", ELL_ERROR);
 		return false;
 	}
-
-	std::vector<const char*> extensionsToEnable;
 	extensionsToEnable.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
+#endif
+
+#ifdef XR_USE_GRAPHICS_API_OPENGL_ES
+	if (!ExtensionNames.count(XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME)) {
+		os::Printer::log("OpenXR runtime does not support OpenGL ES", ELL_ERROR);
+		return false;
+	}
+	extensionsToEnable.push_back(XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME);
+#endif
 
 	XrInstanceCreateInfo info = {
 		XR_TYPE_INSTANCE_CREATE_INFO,
@@ -140,7 +185,7 @@ bool COpenXRConnector::createInstance()
 		return false;
 
 	// Print out some info
-	char buf[64 + XR_MAX_RUNTIME_NAME_SIZE];
+	char buf[128 + XR_MAX_RUNTIME_NAME_SIZE];
 	snprintf_irr(buf, sizeof(buf), "[XR] OpenXR Runtime: %s", InstanceProperties.runtimeName);
 	os::Printer::log(buf, ELL_INFORMATION);
 	snprintf_irr(buf, sizeof(buf), "[XR] OpenXR Version: %d.%d.%d",
@@ -159,7 +204,7 @@ bool COpenXRConnector::getSystem()
 		.formFactor = form_factor,
 	};
 	XrResult result = xrGetSystem(Instance, &get_info, &SystemId);
-	if (check(result, "xrGetSystem"))
+	if (!check(result, "xrGetSystem"))
 		return false;
 
 	SystemProps = XrSystemProperties{
@@ -198,6 +243,170 @@ bool COpenXRConnector::getSystem()
 	return true;
 }
 
+bool COpenXRConnector::getViewConfigs()
+{
+	XrResult result;
+	uint32_t count = 0;
+	result = xrEnumerateViewConfigurations(Instance, SystemId, 0, &count, NULL);
+	if (!check(result, "xrEnumerateViewConfigurations"))
+		return false;
+
+	ViewConfigs.clear();
+	ViewConfigs.resize(count);
+	result = xrEnumerateViewConfigurations(Instance, SystemId, count, &count, ViewConfigs.data());
+	if (!check(result, "xrEnumerateViewConfigurations"))
+		return false;
+	ViewConfigs.resize(count);
+
+	// Fetch viewconfig properties
+	ViewConfigProperties.clear();
+	ViewConfigProperties.resize(count, {
+		.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES,
+	});
+	for (uint32_t i = 0; i < count; i++) {
+		result = xrGetViewConfigurationProperties(Instance, SystemId, ViewConfigs[i], &ViewConfigProperties[i]);
+		if (!check(result, "xrGetViewConfigurationProperties"))
+			return false;
+	}
+
+	// Print out some info
+	for (const auto &prop : ViewConfigProperties) {
+		char buf[128];
+		const char *view = "other";
+		switch (prop.viewConfigurationType) {
+		case XR_VIEW_CONFIGURATION_TYPE_PRIMARY_MONO: view = "mono"; break;
+		case XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO: view = "stereo"; break;
+		default: break;
+		}
+		snprintf_irr(buf, sizeof(buf), "[XR] Supported view: %s [type=%d, fovMutable=%s]",
+			view, prop.viewConfigurationType, prop.fovMutable ? "yes" : "no");
+		os::Printer::log(buf, ELL_INFORMATION);
+	}
+	return true;
+}
+
+bool COpenXRConnector::setupStereoView()
+{
+	XrViewConfigurationType chosen = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+	uint32_t count = 0;
+	XrResult result;
+	result = xrEnumerateViewConfigurationViews(Instance, SystemId, chosen, 0, &count, NULL);
+	if (!check(result, "xrEnumerateViewConfigurationViews"))
+		return false;
+
+	ActiveViews.clear();
+	ActiveViews.resize(count, { .type = XR_TYPE_VIEW_CONFIGURATION_VIEW});
+
+	result = xrEnumerateViewConfigurationViews(Instance, SystemId, chosen, count, &count, ActiveViews.data());
+	if (!check(result, "xrEnumerateViewConfigurationViews"))
+		return false;
+	ActiveViews.resize(count);
+
+	// Print out info
+	os::Printer::log("[XR] Using stereo view", ELL_INFORMATION);
+	for (uint32_t i = 0; i < ActiveViews.size(); i++) {
+		const auto &av = ActiveViews[i];
+		char buf[256];
+		snprintf_irr(buf, sizeof(buf),
+			"[XR] Index %d: Recommended/Max Resolution %dx%d/%dx%d, Swapchain samples %d/%d",
+			i,
+			av.recommendedImageRectWidth,
+			av.recommendedImageRectHeight,
+			av.maxImageRectWidth,
+			av.maxImageRectHeight,
+			av.recommendedSwapchainSampleCount,
+			av.maxSwapchainSampleCount);
+		os::Printer::log(buf, ELL_INFORMATION);
+	}
+	return true;
+
+}
+
+bool COpenXRConnector::verifyGraphics()
+{
+	XrResult result;
+
+	// OpenXR requires checking graphics compatibility before creating a session.
+	// xrGetInstanceProcAddr must be used, since these methods might load in dynamically.
+	XrVersion minApiVersionSupported = 0;
+	XrVersion maxApiVersionSupported = 0;
+	int compatibility = 0;
+
+#ifdef XR_USE_GRAPHICS_API_OPENGL
+	{
+		PFN_xrGetOpenGLGraphicsRequirementsKHR pfn_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
+		result = xrGetInstanceProcAddr(Instance, "xrGetOpenGLGraphicsRequirementsKHR",
+			(PFN_xrVoidFunction*)&pfn_xrGetOpenGLGraphicsRequirementsKHR);
+		if (!check(result, "xrGetInstanceProcAddr"))
+			return false;
+
+		XrGraphicsRequirementsOpenGLKHR reqs;
+		result = pfn_xrGetOpenGLGraphicsRequirementsKHR(Instance, SystemId, &reqs);
+		if (!check(result, "xrGetOpenGLGraphicsRequirementsKHR"))
+			return false;
+		minApiVersionSupported = reqs.minApiVersionSupported;
+		maxApiVersionSupported = reqs.maxApiVersionSupported;
+		compatibility = 0;
+	}
+#endif
+
+#ifdef XR_USE_GRAPHICS_API_OPENGL_ES
+	{
+		PFN_xrGetOpenGLESGraphicsRequirementsKHR pfn_xrGetOpenGLESGraphicsRequirementsKHR = nullptr;
+		result = xrGetInstanceProcAddr(Instance, "xrGetOpenGLESGraphicsRequirementsKHR",
+			(PFN_xrVoidFunction*)&pfn_xrGetOpenGLESGraphicsRequirementsKHR);
+		if (!check(result, "xrGetInstanceProcAddr"))
+			return false;
+
+		XrGraphicsRequirementsOpenGLESKHR reqs;
+		result = pfn_xrGetOpenGLESGraphicsRequirementsKHR(Instance, SystemId, &reqs);
+		if (!check(result, "xrGetOpenGLESGraphicsRequirementsKHR"))
+			return false;
+		minApiVersionSupported = reqs.minApiVersionSupported;
+		maxApiVersionSupported = reqs.maxApiVersionSupported;
+		compatibility = SDL_GL_CONTEXT_PROFILE_ES;
+	}
+#endif
+
+	char buf[128];
+	snprintf_irr(buf, sizeof(buf),
+		"[XR] OpenXR supports OpenGL%s version range (%d.%d.%d, %d.%d.%d)",
+		compatibility == SDL_GL_CONTEXT_PROFILE_ES ? "ES" : "",
+		XR_VERSION_MAJOR(minApiVersionSupported),
+		XR_VERSION_MINOR(minApiVersionSupported),
+		XR_VERSION_PATCH(minApiVersionSupported),
+		XR_VERSION_MAJOR(maxApiVersionSupported),
+		XR_VERSION_MINOR(maxApiVersionSupported),
+		XR_VERSION_PATCH(maxApiVersionSupported));
+	os::Printer::log(buf, ELL_INFORMATION);
+
+	int glmajor = 0;
+	int glminor = 0;
+	int glmask = 0;
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &glmajor);
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &glminor);
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &glmask);
+	XrVersion sdl_gl_version = XR_MAKE_VERSION(glmajor, glminor, 0);
+
+	snprintf_irr(buf, sizeof(buf),
+		"[XR] SDL is configured for OpenGL%s %d.%d.%d",
+		glmask == SDL_GL_CONTEXT_PROFILE_ES ? "ES" : "",
+		glmajor,
+		glminor,
+		glmask);
+	os::Printer::log(buf, ELL_INFORMATION);
+
+	if (glmask != compatibility) {
+		os::Printer::log("[XR] Unexpected profile mismatch (OpenGL vs. OpenGLES)", ELL_ERROR);
+		return false;
+	}
+
+	if (sdl_gl_version < minApiVersionSupported || sdl_gl_version > maxApiVersionSupported) {
+		os::Printer::log("[XR] OpenGL initialized with incompatible version", ELL_ERROR);
+		return false;
+	}
+	return true;
+}
 
 // SDL and OpenXR don't know how to talk to each other
 //
@@ -273,25 +482,6 @@ bool COpenXRConnector::createSession()
 	return true;
 }
 
-bool COpenXRConnector::loadExtensions()
-{
-	XrResult result;
-	uint32_t ext_count = 0;
-	result = xrEnumerateInstanceExtensionProperties(NULL, 0, &ext_count, NULL);
-	if (!check(result, "xrEnumerateInstanceExtensionProperties"))
-		return false;
-
-	Extensions.resize(ext_count, { XR_TYPE_EXTENSION_PROPERTIES, nullptr });
-	result = xrEnumerateInstanceExtensionProperties(NULL, ext_count, &ext_count, Extensions.data());
-	if (!check(result, "xrEnumerateInstanceExtensionProperties"))
-		return false;
-
-	for (const auto &extension : Extensions) {
-		ExtensionNames.emplace(extension.extensionName);
-	}
-	return true;
-}
-
 bool COpenXRConnector::check(XrResult result, const char* func)
 {
 	if (XR_SUCCEEDED(result))
@@ -311,7 +501,7 @@ bool COpenXRConnector::check(XrResult result, const char* func)
 	if (Instance && xrResultToString(Instance, result, buf) == XR_SUCCESS) {
 		// buf was written
 	} else {
-		sprintf(buf, "XR_ERROR %d", (int)result);
+		snprintf_irr(buf, sizeof(buf), "XR_ERROR(%d)", (int)result);
 	}
 
 	std::string text = func;
