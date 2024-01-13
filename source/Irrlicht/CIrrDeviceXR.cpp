@@ -17,7 +17,7 @@ CIrrDeviceXR::CIrrDeviceXR(const SIrrlichtCreationParameters& param)
 		// SDL was unable to initialize
 		return;
 
-	XRConnector = createOpenXRConnector(VideoDriver);
+	XRConnector = createOpenXRConnector(VideoDriver, XRMF_ROOM_SCALE);
 	if (!XRConnector->Init()) {
 		delete XRConnector;
 		XRConnector = nullptr;

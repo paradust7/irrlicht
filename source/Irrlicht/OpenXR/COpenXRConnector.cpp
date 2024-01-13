@@ -2,10 +2,13 @@
 
 #ifdef _IRR_COMPILE_WITH_XR_DEVICE_
 
+#include "mt_opengl.h"
 #include "os.h"
 #include "IOpenXRConnector.h"
-#include <unordered_set>
 #include <SDL_video.h>
+#include <cassert>
+#include <unordered_set>
+
 
 // See COpenXRConnector::createSession() for why this is needed.
 #if defined(WIN32)
@@ -51,7 +54,7 @@ namespace irr
 
 class COpenXRConnector : public IOpenXRConnector {
 	public:
-		COpenXRConnector(video::IVideoDriver* driver);
+		COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags);
 		virtual ~COpenXRConnector();
 		virtual bool Init() override;
 	protected:
@@ -60,13 +63,28 @@ class COpenXRConnector : public IOpenXRConnector {
 		bool createInstance();
 		bool getSystem();
 		bool getViewConfigs();
-		bool setupStereoView();
+		bool setupViews();
 		bool verifyGraphics();
 		bool createSession();
+		bool setupPlaySpace();
+		bool beginSession();
+		bool getSwapchainFormats();
+		bool createSwapchains();
 
+		// Helper methods
 		bool check(XrResult result, const char* func);
+		bool makeSwapchain(
+			int viewIndex,
+			XrSwapchainUsageFlags usageFlags,
+			int64_t format,
+			XrSwapchain *swapchainOut,
+			std::vector<GLuint> *imagesOut);
 
 		video::IVideoDriver* VideoDriver;
+		uint32_t ModeFlags;
+
+		float NearZ = 0.01f;
+		float FarZ = 100.f;
 
 		// Supported extensions
 		std::vector<XrExtensionProperties> Extensions;
@@ -81,23 +99,48 @@ class COpenXRConnector : public IOpenXRConnector {
 		XrSystemProperties SystemProps;
 
 		// Supported View Configurations (mono, stereo, etc)
-		std::vector<XrViewConfigurationType> ViewConfigs;
+		std::vector<XrViewConfigurationType> ViewConfigTypes;
 		std::vector<XrViewConfigurationProperties> ViewConfigProperties;
 
 		// Parameters for the view config we're using
 		// For stereo, this has left and right eyes
-		std::vector<XrViewConfigurationView> ActiveViews;
+		XrViewConfigurationType ViewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+		std::vector<XrViewConfigurationView> ViewConfigs;
 
 		XrSession Session = XR_NULL_HANDLE;
 
-		XrViewConfigurationType ViewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 		XrReferenceSpaceType PlaySpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+		XrSpace PlaySpace = XR_NULL_HANDLE;
+
+		// Ordered by optimal performance/quality (best first)
+		std::vector<int64_t> SupportedFormats;
+		int64_t ColorFormat;
+		int64_t DepthFormat;
+
+		struct ViewDataStruct {
+			XrSwapchain Swapchain;
+			XrSwapchain DepthSwapchain;
+
+			// These are parallel arrays
+			std::vector<GLuint> FrameBuffers;
+			std::vector<GLuint> TextureIDs;
+			std::vector<GLuint> DepthTextureIDs;
+
+			// Caution: ViewLayers contain pointers to this.
+			XrCompositionLayerDepthInfoKHR DepthInfo;
+		};
+
+		// Projection Swapchains. One for each view (eye).
+		std::vector<ViewDataStruct> ViewData;
+		std::vector<XrCompositionLayerProjectionView> ViewLayers;
 };
 
-COpenXRConnector::COpenXRConnector(video::IVideoDriver* driver)
-	: VideoDriver(driver)
+COpenXRConnector::COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags)
+	: VideoDriver(driver), ModeFlags(mode_flags)
 {
 	VideoDriver->grab();
+	if (mode_flags & XRMF_ROOM_SCALE)
+		PlaySpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
 }
 
 COpenXRConnector::~COpenXRConnector()
@@ -112,11 +155,14 @@ bool COpenXRConnector::Init() {
 	if (!createInstance()) return false;
 	if (!getSystem()) return false;
 	if (!getViewConfigs()) return false;
-	if (!setupStereoView()) return false;
+	if (!setupViews()) return false;
 	if (!verifyGraphics()) return false;
-
-	//if (!createSession())
-	//	return false;
+	if (!createSession()) return false;
+	// TODO: Initialize hand tracking
+	if (!setupPlaySpace()) return false;
+	if (!beginSession()) return false;
+	if (!getSwapchainFormats()) return false;
+	if (!createSwapchains()) return false;
 	return true;
 }
 
@@ -251,12 +297,12 @@ bool COpenXRConnector::getViewConfigs()
 	if (!check(result, "xrEnumerateViewConfigurations"))
 		return false;
 
-	ViewConfigs.clear();
-	ViewConfigs.resize(count);
-	result = xrEnumerateViewConfigurations(Instance, SystemId, count, &count, ViewConfigs.data());
+	ViewConfigTypes.clear();
+	ViewConfigTypes.resize(count);
+	result = xrEnumerateViewConfigurations(Instance, SystemId, count, &count, ViewConfigTypes.data());
 	if (!check(result, "xrEnumerateViewConfigurations"))
 		return false;
-	ViewConfigs.resize(count);
+	ViewConfigTypes.resize(count);
 
 	// Fetch viewconfig properties
 	ViewConfigProperties.clear();
@@ -264,7 +310,7 @@ bool COpenXRConnector::getViewConfigs()
 		.type = XR_TYPE_VIEW_CONFIGURATION_PROPERTIES,
 	});
 	for (uint32_t i = 0; i < count; i++) {
-		result = xrGetViewConfigurationProperties(Instance, SystemId, ViewConfigs[i], &ViewConfigProperties[i]);
+		result = xrGetViewConfigurationProperties(Instance, SystemId, ViewConfigTypes[i], &ViewConfigProperties[i]);
 		if (!check(result, "xrGetViewConfigurationProperties"))
 			return false;
 	}
@@ -285,37 +331,36 @@ bool COpenXRConnector::getViewConfigs()
 	return true;
 }
 
-bool COpenXRConnector::setupStereoView()
+bool COpenXRConnector::setupViews()
 {
-	XrViewConfigurationType chosen = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	uint32_t count = 0;
 	XrResult result;
-	result = xrEnumerateViewConfigurationViews(Instance, SystemId, chosen, 0, &count, NULL);
+	result = xrEnumerateViewConfigurationViews(Instance, SystemId, ViewType, 0, &count, NULL);
 	if (!check(result, "xrEnumerateViewConfigurationViews"))
 		return false;
 
-	ActiveViews.clear();
-	ActiveViews.resize(count, { .type = XR_TYPE_VIEW_CONFIGURATION_VIEW});
+	ViewConfigs.clear();
+	ViewConfigs.resize(count, { .type = XR_TYPE_VIEW_CONFIGURATION_VIEW});
 
-	result = xrEnumerateViewConfigurationViews(Instance, SystemId, chosen, count, &count, ActiveViews.data());
+	result = xrEnumerateViewConfigurationViews(Instance, SystemId, ViewType, count, &count, ViewConfigs.data());
 	if (!check(result, "xrEnumerateViewConfigurationViews"))
 		return false;
-	ActiveViews.resize(count);
+	ViewConfigs.resize(count);
 
 	// Print out info
 	os::Printer::log("[XR] Using stereo view", ELL_INFORMATION);
-	for (uint32_t i = 0; i < ActiveViews.size(); i++) {
-		const auto &av = ActiveViews[i];
+	for (uint32_t i = 0; i < ViewConfigs.size(); i++) {
+		const auto &conf = ViewConfigs[i];
 		char buf[256];
 		snprintf_irr(buf, sizeof(buf),
-			"[XR] Index %d: Recommended/Max Resolution %dx%d/%dx%d, Swapchain samples %d/%d",
+			"[XR] View %d: Recommended/Max Resolution %dx%d/%dx%d, Swapchain samples %d/%d",
 			i,
-			av.recommendedImageRectWidth,
-			av.recommendedImageRectHeight,
-			av.maxImageRectWidth,
-			av.maxImageRectHeight,
-			av.recommendedSwapchainSampleCount,
-			av.maxSwapchainSampleCount);
+			conf.recommendedImageRectWidth,
+			conf.recommendedImageRectHeight,
+			conf.maxImageRectWidth,
+			conf.maxImageRectHeight,
+			conf.recommendedSwapchainSampleCount,
+			conf.maxSwapchainSampleCount);
 		os::Printer::log(buf, ELL_INFORMATION);
 	}
 	return true;
@@ -330,7 +375,7 @@ bool COpenXRConnector::verifyGraphics()
 	// xrGetInstanceProcAddr must be used, since these methods might load in dynamically.
 	XrVersion minApiVersionSupported = 0;
 	XrVersion maxApiVersionSupported = 0;
-	int compatibility = 0;
+	bool gles = false;
 
 #ifdef XR_USE_GRAPHICS_API_OPENGL
 	{
@@ -346,7 +391,6 @@ bool COpenXRConnector::verifyGraphics()
 			return false;
 		minApiVersionSupported = reqs.minApiVersionSupported;
 		maxApiVersionSupported = reqs.maxApiVersionSupported;
-		compatibility = 0;
 	}
 #endif
 
@@ -364,14 +408,14 @@ bool COpenXRConnector::verifyGraphics()
 			return false;
 		minApiVersionSupported = reqs.minApiVersionSupported;
 		maxApiVersionSupported = reqs.maxApiVersionSupported;
-		compatibility = SDL_GL_CONTEXT_PROFILE_ES;
+		gles = true;
 	}
 #endif
 
 	char buf[128];
 	snprintf_irr(buf, sizeof(buf),
 		"[XR] OpenXR supports OpenGL%s version range (%d.%d.%d, %d.%d.%d)",
-		compatibility == SDL_GL_CONTEXT_PROFILE_ES ? "ES" : "",
+		gles ? "ES" : "",
 		XR_VERSION_MAJOR(minApiVersionSupported),
 		XR_VERSION_MINOR(minApiVersionSupported),
 		XR_VERSION_PATCH(minApiVersionSupported),
@@ -387,16 +431,17 @@ bool COpenXRConnector::verifyGraphics()
 	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &glminor);
 	SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &glmask);
 	XrVersion sdl_gl_version = XR_MAKE_VERSION(glmajor, glminor, 0);
+	bool is_gles = glmask & SDL_GL_CONTEXT_PROFILE_ES;
 
 	snprintf_irr(buf, sizeof(buf),
 		"[XR] SDL is configured for OpenGL%s %d.%d.%d",
-		glmask == SDL_GL_CONTEXT_PROFILE_ES ? "ES" : "",
+		is_gles ? "ES" : "",
 		glmajor,
 		glminor,
 		glmask);
 	os::Printer::log(buf, ELL_INFORMATION);
 
-	if (glmask != compatibility) {
+	if (is_gles != gles) {
 		os::Printer::log("[XR] Unexpected profile mismatch (OpenGL vs. OpenGLES)", ELL_ERROR);
 		return false;
 	}
@@ -432,22 +477,6 @@ bool COpenXRConnector::verifyGraphics()
 // make it certain.
 bool COpenXRConnector::createSession()
 {
-/*
-	bool using_egl = false;
-	switch (VideoDriver->getDriverType())
-	{
-	case video::EDT_OPENGL:
-		break;
-	case video::EDT_OPENGL3:
-		break;
-	case video::EDT_OGLES2:
-		using_egl = true;
-		break;
-	default:
-		os::Printer::log("Unhandled video driver type in XR device", ELL_ERROR);
-		return false;
-	}
-
 	XrSessionCreateInfo session_create_info = {
 		.type = XR_TYPE_SESSION_CREATE_INFO,
 		.next = nullptr, // to be filled in
@@ -456,29 +485,244 @@ bool COpenXRConnector::createSession()
 
 	const char* raw_sdl_driver = SDL_GetCurrentVideoDriver();
 	std::string sdl_driver = raw_sdl_driver ? raw_sdl_driver : "";
+
 #ifdef XR_USE_PLATFORM_WIN32
-	if (sdl_driver == "windows") {
-		XrGraphicsBindingOpenGLWin32KHR binding{
-			.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR,
-		};
-		binding.hDC = wglGetCurrentDC();
-		binding.hGLRC = wglGetCurrentContext();
+	if (sdl_driver != "windows") {
+		os::Printer::log("[XR] Expected SDL driver 'windows'", ELL_ERROR);
+		return false;
 	}
-#endif
-#ifdef XR_USE_PLATFORM_XLIB
-	if (sdl_driver == "x11") {
-		XrGraphicsBindingOpenGLXlibKHR binding{
-			.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR,
-		};
-		binding.xDisplay = XOpenDisplay(NULL);
-		binding.glxContext = glXGetCurrentContext();
-		binding.glxDrawable = glXGetCurrentDrawable();
-	}
-#endif
-#ifdef XR_USE_PLATFORM_EGL
+
+	XrGraphicsBindingOpenGLWin32KHR binding{
+		.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR,
+	};
+	binding.hDC = wglGetCurrentDC();
+	binding.hGLRC = wglGetCurrentContext();
+	session_create_info.next = &binding;
 
 #endif
-*/
+
+#ifdef XR_USE_PLATFORM_XLIB
+	if (sdl_driver != "x11") {
+		os::Printer::log("[XR] Expected SDL driver 'x11'", ELL_ERROR);
+		return false;
+	}
+	XrGraphicsBindingOpenGLXlibKHR binding{
+		.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_XLIB_KHR,
+	};
+	binding.xDisplay = XOpenDisplay(NULL);
+	binding.glxContext = glXGetCurrentContext();
+	binding.glxDrawable = glXGetCurrentDrawable();
+	session_create_info.next = &binding;
+#endif
+
+#ifdef XR_USE_PLATFORM_EGL
+#error "Not implemented"
+#endif
+	XrResult result;
+	result = xrCreateSession(Instance, &session_create_info, &Session);
+	if (!check(result, "xrCreateSession"))
+		return false;
+
+	return true;
+}
+
+bool COpenXRConnector::setupPlaySpace()
+{
+	XrPosef identity = {
+		.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0},
+		.position = {.x = 0, .y = 0, .z = 0},
+	};
+	XrReferenceSpaceCreateInfo create_info = {
+		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		.referenceSpaceType = PlaySpaceType,
+		.poseInReferenceSpace = identity,
+	};
+	XrResult result;
+	result = xrCreateReferenceSpace(Session, &create_info, &PlaySpace);
+	if (!check(result, "xrCreateReferenceSpace"))
+		return false;
+
+	return true;
+}
+
+bool COpenXRConnector::beginSession()
+{
+	XrSessionBeginInfo session_begin_info = {
+		.type = XR_TYPE_SESSION_BEGIN_INFO,
+		.primaryViewConfigurationType = ViewType,
+	};
+	XrResult result;
+	result = xrBeginSession(Session, &session_begin_info);
+	if (!check(result, "xrBeginSession"))
+		return false;
+
+	return true;
+}
+
+bool COpenXRConnector::getSwapchainFormats()
+{
+	XrResult result;
+	uint32_t count;
+	result = xrEnumerateSwapchainFormats(Session, 0, &count, NULL);
+	if (!check(result, "xrEnumerateSwapchainFormats"))
+		return false;
+
+	SupportedFormats.resize(count);
+	result = xrEnumerateSwapchainFormats(Session, count, &count, SupportedFormats.data());
+	if (!check(result, "xrEnumerateSwapchainFormats"))
+		return false;
+	SupportedFormats.resize(count);
+
+	// TODO: Determine the range of formats that need to be supported here.
+	int64_t preferred_format = GL_SRGB8_ALPHA8;
+	int64_t preferred_depth_format = GL_DEPTH_COMPONENT32F;
+
+	ColorFormat = SupportedFormats[0];
+	DepthFormat = -1;
+	for (const auto& format : SupportedFormats) {
+		if (format == preferred_format) {
+			ColorFormat = format;
+		}
+		if (format == preferred_depth_format) {
+			DepthFormat = format;
+		}
+	}
+	char buf[128];
+	snprintf_irr(buf, sizeof(buf),
+		"[XR] ColorFormat %" PRId64 " (%s)", ColorFormat,
+		(ColorFormat == GL_SRGB8_ALPHA8) ? "GL_SRGB8_ALPHA8" : "unknown");
+	os::Printer::log(buf, ELL_INFORMATION);
+	snprintf_irr(buf, sizeof(buf),
+		"[XR] DepthFormat %" PRId64 " (%s)", DepthFormat,
+		(ColorFormat == GL_DEPTH_COMPONENT32F) ? "GL_DEPTH_COMPONENT32F" : "unknown");
+	os::Printer::log(buf, ELL_INFORMATION);
+	if (ColorFormat != preferred_format) {
+		os::Printer::log("[XR] Using non-preferred color format", ELL_WARNING);
+	}
+	if (DepthFormat == -1) {
+		os::Printer::log("[XR] Couldn't find valid depth buffer format", ELL_ERROR);
+		return false;
+	}
+	return true;
+}
+
+bool COpenXRConnector::makeSwapchain(
+	int viewIndex,
+	XrSwapchainUsageFlags usageFlags,
+	int64_t format,
+	XrSwapchain *swapchainOut,
+	std::vector<GLuint> *imagesOut)
+{
+	XrSwapchainCreateInfo swapchain_create_info{
+		.type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
+		.next = NULL,
+		.createFlags = 0,
+		.usageFlags = usageFlags,
+		.format = format,
+		.sampleCount = ViewConfigs[viewIndex].recommendedSwapchainSampleCount,
+		.width = ViewConfigs[viewIndex].recommendedImageRectWidth,
+		.height = ViewConfigs[viewIndex].recommendedImageRectHeight,
+		.faceCount = 1,
+		.arraySize = 1,
+		.mipCount = 1,
+	};
+	XrResult result;
+	result = xrCreateSwapchain(Session, &swapchain_create_info, swapchainOut);
+	if (!check(result, "xrCreateSwapchain"))
+		return false;
+
+	uint32_t swapchain_length;
+	result = xrEnumerateSwapchainImages(*swapchainOut, 0, &swapchain_length, nullptr);
+	if (!check(result, "xrEnumerateSwapchainImages"))
+		return false;
+
+#ifdef XR_USE_GRAPHICS_API_OPENGL
+	std::vector<XrSwapchainImageOpenGLKHR> images(swapchain_length,
+		XrSwapchainImageOpenGLKHR{ .type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR });
+#endif
+#ifdef XR_USE_GRAPHICS_API_OPENGL_ES
+	std::vector<XrSwapchainImageOpenGLESKHR> images(swapchain_length,
+		XrSwapchainImageOpenGLESKHR{ .type = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KHR });
+#endif
+	imagesOut->resize(swapchain_length);
+	result = xrEnumerateSwapchainImages(
+		*swapchainOut,
+		swapchain_length,
+		&swapchain_length,
+		(XrSwapchainImageBaseHeader*)images.data());
+	if (!check(result, "xrEnumerateSwapchainImages"))
+		return false;
+
+	assert(imagesOut->size() == swapchain_length);
+	for (uint32_t i = 0; i < swapchain_length; ++i) {
+		(*imagesOut)[i] = images[i].image;
+	}
+	return true;
+
+}
+
+
+bool COpenXRConnector::createSwapchains()
+{
+	size_t viewCount = ViewConfigs.size();
+	ViewData.resize(viewCount);
+	for (size_t viewIndex = 0; viewIndex < viewCount; viewIndex++) {
+		auto& cur = ViewData[viewIndex];
+
+		if (!makeSwapchain(
+				viewIndex,
+				XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+				ColorFormat, &cur.Swapchain, &cur.TextureIDs))
+			return false;
+
+		// Make frame buffers
+		cur.FrameBuffers.resize(cur.TextureIDs.size());
+		GL.GenFramebuffers(cur.FrameBuffers.size(), cur.FrameBuffers.data());
+
+		// Make depth buffers
+		if (!makeSwapchain(
+				viewIndex,
+				XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+				DepthFormat, &cur.DepthSwapchain, &cur.DepthTextureIDs))
+			return false;
+
+		if (cur.TextureIDs.size() != cur.DepthTextureIDs.size()) {
+			os::Printer::log("[XR] Inconsistent swapchain lengths", ELL_ERROR);
+			return false;
+		}
+
+		cur.DepthInfo = XrCompositionLayerDepthInfoKHR{
+			.type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
+			.next = NULL,
+			.minDepth = 0.f,
+			.maxDepth = 1.f,
+			.nearZ = NearZ,
+			.farZ = FarZ,
+		};
+		cur.DepthInfo.subImage.swapchain = cur.DepthSwapchain;
+		cur.DepthInfo.subImage.imageArrayIndex = 0;
+		cur.DepthInfo.subImage.imageRect.offset.x = 0;
+		cur.DepthInfo.subImage.imageRect.offset.y = 0;
+		cur.DepthInfo.subImage.imageRect.extent.width = ViewConfigs[viewIndex].recommendedImageRectWidth;
+		cur.DepthInfo.subImage.imageRect.extent.height = ViewConfigs[viewIndex].recommendedImageRectHeight;
+	}
+
+	// Fill out projection views
+	ViewLayers.resize(viewCount);
+	for (size_t viewIndex = 0; viewIndex < viewCount; viewIndex++) {
+		auto& layer = ViewLayers[viewIndex];
+		layer = XrCompositionLayerProjectionView{
+			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW,
+			.next = &ViewData[viewIndex].DepthInfo,
+		};
+		layer.subImage.swapchain = ViewData[viewIndex].Swapchain;
+		layer.subImage.imageArrayIndex = 0;
+		layer.subImage.imageRect.offset.x = 0;
+		layer.subImage.imageRect.offset.y = 0;
+		layer.subImage.imageRect.extent.width = ViewConfigs[viewIndex].recommendedImageRectWidth;
+		layer.subImage.imageRect.extent.height = ViewConfigs[viewIndex].recommendedImageRectHeight;
+		// pose and fov are filled in at the beginning of each frame
+	}
 	return true;
 }
 
@@ -511,9 +755,9 @@ bool COpenXRConnector::check(XrResult result, const char* func)
         return false;
 }
 
-IOpenXRConnector* createOpenXRConnector(video::IVideoDriver* driver)
+IOpenXRConnector* createOpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags)
 {
-	return new COpenXRConnector(driver);
+	return new COpenXRConnector(driver, mode_flags);
 }
 
 } // namespace irr

@@ -10,14 +10,19 @@
 namespace irr
 {
 
-	class IOpenXRConnector {
-	public:
-		virtual bool Init() = 0;
-		virtual ~IOpenXRConnector() { };
-	};
+enum XR_MODE_FLAGS {
+	XRMF_ROOM_SCALE = 0x1,
+};
 
 
-	IOpenXRConnector* createOpenXRConnector(video::IVideoDriver* driver);
+class IOpenXRConnector {
+public:
+	virtual bool Init() = 0;
+	virtual ~IOpenXRConnector() { };
+};
+
+
+IOpenXRConnector* createOpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags);
 
 } // namespace irr
 
