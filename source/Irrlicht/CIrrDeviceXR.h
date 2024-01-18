@@ -45,7 +45,7 @@ namespace irr
 		bool isDeviceMotionAvailable() override;
 
 	protected:
-		IOpenXRConnector *XRConnector;
+		std::unique_ptr<IOpenXRConnector> XRConnector;
 		bool DeviceMotionActive;
 	};
 

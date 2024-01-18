@@ -1,0 +1,28 @@
+#pragma once
+
+#ifdef _IRR_COMPILE_WITH_XR_DEVICE_
+
+#include "IVideoDriver.h"
+#include "OpenXRHeaders.h"
+#include "IOpenXRConnector.h"
+
+#include <cstdint>
+#include <memory>
+
+namespace irr {
+
+class IOpenXRInstance {
+public:
+	virtual ~IOpenXRInstance() {}
+	virtual bool HandleEvents() = 0;
+	virtual bool TryBeginFrame(int64_t *predicted_time_delta) = 0;
+	virtual bool NextView(ViewRenderInfo *info) = 0;
+};
+
+std::unique_ptr<IOpenXRInstance> createOpenXRInstance(
+	video::IVideoDriver* driver,
+	XrReferenceSpaceType playSpaceType);
+
+} // end namespace irr
+
+#endif // _IRR_COMPILE_WITH_XR_DEVICE_

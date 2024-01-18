@@ -18,9 +18,7 @@ CIrrDeviceXR::CIrrDeviceXR(const SIrrlichtCreationParameters& param)
 		return;
 
 	XRConnector = createOpenXRConnector(VideoDriver, XRMF_ROOM_SCALE);
-	if (!XRConnector->Init()) {
-		delete XRConnector;
-		XRConnector = nullptr;
+	if (!XRConnector) {
 		// Signal failure to createDeviceEx
 		VideoDriver->drop();
 		VideoDriver = 0;
@@ -32,8 +30,6 @@ CIrrDeviceXR::CIrrDeviceXR(const SIrrlichtCreationParameters& param)
 //! destructor
 CIrrDeviceXR::~CIrrDeviceXR()
 {
-	if (XRConnector)
-		delete XRConnector;
 }
 
 //! Activate device motion.
