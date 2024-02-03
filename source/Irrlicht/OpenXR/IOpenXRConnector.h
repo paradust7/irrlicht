@@ -4,6 +4,7 @@
 
 #include "IVideoDriver.h"
 #include "IRenderTarget.h"
+#include "XrViewInfo.h"
 
 #include <vector>
 #include <unordered_set>
@@ -15,31 +16,34 @@ enum XR_MODE_FLAGS {
 	XRMF_ROOM_SCALE = 0x1,
 };
 
-enum XR_VIEW_KIND {
-	XRVK_LEFT_EYE = 0,
-	XRVK_RIGHT_EYE = 1,
-	XRVK_OTHER = 2,
-};
-
-
-struct ViewRenderInfo {
-	XR_VIEW_KIND kind;
-	video::IRenderTarget* Target;
-	core::matrix4 View;
-	core::matrix4 Proj;
-};
-
-
+/*
+ * Important:
+ *
+ * After createOpenXRConnector() succeeds, there are no failures at this layer.
+ *
+ * Methods of COpenXRConnector will continue to pretend to work, even if the OpenXR instance is
+ * dead and failing to recreate.
+ *
+ * This is because the OpenXR specification allows clients to reconnect after the runtime comes
+ * back online, even after crash/shutdown/update. Clients with another UI are able to keep
+ * running.
+ *
+ * TODO: Pause the game in the event the system shuts off.
+ *
+ */
 class IOpenXRConnector {
 public:
-	virtual ~IOpenXRConnector() {};
+	virtual ~IOpenXRConnector() {}
 
 	// Handles all pending events. Returns when the event queue is empty.
 	// This needs to be called at least once between frames (not during a frame).
 	// If the event queue overflows, events are lost.
-	virtual void HandleEvents() = 0;
+	virtual void handleEvents() = 0;
 
-	// TryBeginFrame
+	// Schedule a recenter before the next frame.
+	virtual void recenter() = 0;
+
+	// tryBeginFrame
 	//
 	// Try to begin the next frame. This method blocks to achieve VSync with the
 	// HMD display, so it should only be called when everything else has been processed.
@@ -59,17 +63,17 @@ public:
 	// HandleEvents() should continue to be called every frame. If the system
 	// comes back online, it will re-initialize, and TryBeginFrame() will return
 	// true again.
-	virtual bool TryBeginFrame(int64_t *predicted_time_delta) = 0;
+	virtual bool tryBeginFrame(int64_t *predicted_time_delta) = 0;
 
-	// Once a frame has begun, call NextView until it returns false.
+	// Once a frame has begun, call NextView repeatedly until it returns false.
 	//
 	// For each view, render the appropriate image.
 	//
-	// Don't assume every view will appear. If the system crashes
-	// during rendering, it may stop short.
+	// Don't assume every view will appear. If the openxr service crashes during
+	// rendering, it may stop short.
 	//
 	// After NextView returns false, the frame is considered ended.
-	virtual bool NextView(ViewRenderInfo *info) = 0;
+	virtual bool nextView(core::XrViewInfo* info) = 0;
 };
 
 

@@ -10,15 +10,15 @@ namespace irr
 
 //! constructor
 CIrrDeviceXR::CIrrDeviceXR(const SIrrlichtCreationParameters& param)
-	: CIrrDeviceSDL(param), XRConnector(nullptr), DeviceMotionActive(false)
+	: CIrrDeviceSDL(param), Connector(nullptr), DeviceMotionActive(false)
 
 {
 	if (!VideoDriver)
 		// SDL was unable to initialize
 		return;
 
-	XRConnector = createOpenXRConnector(VideoDriver, XRMF_ROOM_SCALE);
-	if (!XRConnector) {
+	Connector = createOpenXRConnector(VideoDriver, 0);
+	if (!Connector) {
 		// Signal failure to createDeviceEx
 		VideoDriver->drop();
 		VideoDriver = 0;
@@ -54,6 +54,40 @@ bool CIrrDeviceXR::isDeviceMotionActive()
 bool CIrrDeviceXR::isDeviceMotionAvailable()
 {
 	return true;
+}
+
+bool CIrrDeviceXR::hasXR() const
+{
+	return true;
+}
+
+void CIrrDeviceXR::recenterXR()
+{
+	Connector->recenter();
+}
+
+void CIrrDeviceXR::startXR()
+{
+}
+
+bool CIrrDeviceXR::beginFrame()
+{
+	Connector->handleEvents();
+	int64_t delta;
+	if (!Connector->tryBeginFrame(&delta)) {
+		return false;
+	}
+	return true;
+
+}
+
+bool CIrrDeviceXR::nextView(core::XrViewInfo* info)
+{
+	return Connector->nextView(info);
+}
+
+void CIrrDeviceXR::stopXR()
+{
 }
 
 } // namespace irr

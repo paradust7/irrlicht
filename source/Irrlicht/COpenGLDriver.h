@@ -407,6 +407,8 @@ namespace video
 
 		ITexture* createDeviceDependentTextureCubemap(const io::path& name, const core::array<IImage*>& image) override;
 
+		ITexture* useDeviceDependentTexture(const io::path& name, E_DRIVER_TYPE driverType, void *textureId, ECOLOR_FORMAT colorFormat, u32 width, u32 height) override;
+
 		//! creates a transposed matrix in supplied GLfloat array to pass to OpenGL
 		inline void getGLMatrix(GLfloat gl_matrix[16], const core::matrix4& m);
 		inline void getGLTextureMatrix(GLfloat gl_matrix[16], const core::matrix4& m);

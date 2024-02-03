@@ -159,6 +159,13 @@ namespace irr
 		//! Resize the render window.
 		void setWindowSize(const irr::core::dimension2d<u32>& size) override {}
 
+		bool hasXR() const override { return false; }
+		void recenterXR() override {}
+		void startXR() override {}
+		bool beginFrame() override { return false; }
+		bool nextView(core::XrViewInfo* info) override { return false; }
+		void stopXR() override {}
+
 	protected:
 
 		void createGUIAndScene();

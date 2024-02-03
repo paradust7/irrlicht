@@ -3,6 +3,8 @@
 #ifdef _IRR_COMPILE_WITH_XR_DEVICE_
 
 #include "OpenXRHeaders.h"
+#include "ITexture.h"
+#include "IVideoDriver.h"
 
 #include <memory>
 
@@ -10,9 +12,15 @@ namespace irr {
 
 class IOpenXRSwapchain {
 public:
+	virtual ~IOpenXRSwapchain() {}
+
 	virtual XrSwapchain getHandle() = 0;
 
-	// Acquire a swapchain index and wait for it to become ready.
+	// Length of the swapchain
+	// Acquired indices run from 0 to getLength() - 1
+	virtual size_t getLength() = 0;
+
+	// Acquire an image in the swapchain and wait for it to become ready.
 	// Must be called after frame has begun.
 	//
 	// Returns true on success.
@@ -21,6 +29,10 @@ public:
 	// (session and instance should be destroyed)
 	virtual bool acquireAndWait() = 0;
 
+	// These can only be called when an image is acquired.
+	virtual size_t getAcquiredIndex() = 0;
+	virtual video::ITexture* getAcquiredTexture() = 0;
+
 	// Release the swapchain.
 	// glFinish() must be called before this,
 	// or else there will be chaos!
@@ -28,6 +40,7 @@ public:
 };
 
 std::unique_ptr<IOpenXRSwapchain> createOpenXRSwapchain(
+	video::IVideoDriver* driver,
 	XrInstance instance,
 	XrSession session,
 	XrSwapchainUsageFlags usageFlags,

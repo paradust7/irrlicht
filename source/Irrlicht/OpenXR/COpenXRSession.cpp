@@ -1,9 +1,11 @@
 #ifdef _IRR_COMPILE_WITH_XR_DEVICE_
 
 #include "os.h"
+#include "IOpenXRConnector.h"
 #include "IOpenXRSession.h"
 #include "IOpenXRSwapchain.h"
 #include "Common.h"
+#include "OpenXRMath.h"
 
 #include <SDL_video.h>
 
@@ -19,28 +21,47 @@ public:
 		XrReferenceSpaceType playSpaceType)
 		: Instance(instance), VideoDriver(driver), PlaySpaceType(playSpaceType)
 	{
+		VideoDriver->grab();
 	}
 	virtual ~COpenXRSession() {
+		// Order is important!
+		ViewLayers.clear();
+		for (auto& viewChain : ViewChains) {
+			for (auto target : viewChain.RenderTargets) {
+				if (target)
+					VideoDriver->removeRenderTarget(target);
+			}
+			viewChain.RenderTargets.clear();
+		}
+		ViewChains.clear();
+		if (ViewSpace != XR_NULL_HANDLE)
+			xrDestroySpace(ViewSpace);
 		if (PlaySpace != XR_NULL_HANDLE)
 			xrDestroySpace(PlaySpace);
 		if (Session != XR_NULL_HANDLE)
 			xrDestroySession(Session);
+		VideoDriver->drop();
 	}
 
-	virtual bool TryBeginFrame(int64_t *predicted_time_delta);
-	virtual bool NextView(ViewRenderInfo *info);
-	bool Init();
+	virtual void recenter() override;
+	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) override;
+	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
+	virtual bool handleStateChange(XrEventDataSessionStateChanged *ev) override;
+	bool init();
+	bool endFrame();
 protected:
 	bool getSystem();
 	bool getViewConfigs();
 	bool setupViews();
 	bool verifyGraphics();
 	bool createSession();
-	bool setupPlaySpace();
+	bool setupSpaces();
 	bool beginSession();
 	bool setupSwapchains();
 	bool setupCompositionLayers();
-protected:
+
+	bool recenterPlaySpace(XrTime ref);
+
 	XrInstance Instance;
 	video::IVideoDriver* VideoDriver;
 	XrReferenceSpaceType PlaySpaceType;
@@ -60,30 +81,56 @@ protected:
 	XrViewConfigurationType ViewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	std::vector<XrViewConfigurationView> ViewConfigs;
 
-	// Set by setupPlaySpace()
+	static constexpr XrPosef Identity = {
+                .orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0},
+                .position = {.x = 0, .y = 0, .z = 0},
+	};
+
+	// Set by setupSpaces()
 	XrSpace PlaySpace = XR_NULL_HANDLE;
+	XrPosef PlaySpaceCenter = Identity;
+	XrSpace ViewSpace = XR_NULL_HANDLE;
+	bool DoRecenter = false;
 
 	// Initialized by getSwapchainFormats
 	// Ordered by optimal performance/quality (best first)
 	std::vector<int64_t> SupportedFormats;
 	int64_t ColorFormat;
 	int64_t DepthFormat;
-	float NearZ = 0.01f;
-	float FarZ = 100.f;
+	float ZNear = 1.0f;
+	float ZFar = 20000.f;
 
-	struct ViewStateData {
+	struct ViewChainData {
 		// Initialized by setupSwapchains
                 unique_ptr<IOpenXRSwapchain> Swapchain;
                 unique_ptr<IOpenXRSwapchain> DepthSwapchain;
+
+		// JANK ALERT
+		// IRenderTarget groups together a framebuffer (FBO), texture, and depth/stencil texture.
+		// But OpenXR acquires textures and depth textures independently. Their association is
+		// not permanent.
+		//
+		// As a compromise, these render targets will always be bound to the same FBO and texture,
+		// but their depth texture may be updated every frame.
+		std::vector<video::IRenderTarget*> RenderTargets;
 
 		// Initialized by setupCompositionLayers
 		// `Layers` holds pointers to these structs
 		XrCompositionLayerDepthInfoKHR DepthInfo;
 	};
-	std::vector<ViewStateData> ViewState;
+	std::vector<ViewChainData> ViewChains;
 
 	// Initialized by setupCompositionLayers
-	std::vector<XrCompositionLayerProjectionView> Layers;
+	std::vector<XrCompositionLayerProjectionView> ViewLayers;
+
+	// ----------------------------------------------
+	// These are only valid when InFrame is true
+	bool InFrame = false;
+	uint32_t NextViewIndex = 0;
+	XrFrameState FrameState;
+	XrViewState ViewState;
+	std::vector<XrView> ViewInfo;
+	// ----------------------------------------------
 
 	bool check(XrResult result, const char* func)
 	{
@@ -91,7 +138,7 @@ protected:
 	}
 };
 
-bool COpenXRSession::Init()
+bool COpenXRSession::init()
 {
 	if (!getSystem()) return false;
 	if (!getViewConfigs()) return false;
@@ -99,9 +146,10 @@ bool COpenXRSession::Init()
 	if (!verifyGraphics()) return false;
 	if (!createSession()) return false;
 	// TODO: Initialize hand tracking
-	if (!setupPlaySpace()) return false;
+	if (!setupSpaces()) return false;
 	if (!beginSession()) return false;
 	if (!setupSwapchains()) return false;
+	if (!setupCompositionLayers()) return false;
 	// TODO: Setup actions
 	return true;
 }
@@ -211,7 +259,6 @@ bool COpenXRSession::setupViews()
 		os::Printer::log(buf, ELL_INFORMATION);
 	}
 	return true;
-
 }
 
 bool COpenXRSession::verifyGraphics()
@@ -228,7 +275,9 @@ bool COpenXRSession::verifyGraphics()
 		XR_CHECK(xrGetInstanceProcAddr, Instance, "xrGetOpenGLGraphicsRequirementsKHR",
 			(PFN_xrVoidFunction*)&pfn_xrGetOpenGLGraphicsRequirementsKHR);
 
-		XrGraphicsRequirementsOpenGLKHR reqs;
+		XrGraphicsRequirementsOpenGLKHR reqs = {
+			.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR,
+		};
 		XR_CHECK(pfn_xrGetOpenGLGraphicsRequirementsKHR, Instance, SystemId, &reqs);
 		minApiVersionSupported = reqs.minApiVersionSupported;
 		maxApiVersionSupported = reqs.maxApiVersionSupported;
@@ -241,7 +290,9 @@ bool COpenXRSession::verifyGraphics()
 		XR_CHECK(xrGetInstanceProcAddr, Instance, "xrGetOpenGLESGraphicsRequirementsKHR",
 			(PFN_xrVoidFunction*)&pfn_xrGetOpenGLESGraphicsRequirementsKHR);
 
-		XrGraphicsRequirementsOpenGLESKHR reqs;
+		XrGraphicsRequirementsOpenGLESKHR reqs = {
+			.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR,
+		};
 		XR_CHECK(pfn_xrGetOpenGLESGraphicsRequirementsKHR, Instance, SystemId, &reqs);
 		minApiVersionSupported = reqs.minApiVersionSupported;
 		maxApiVersionSupported = reqs.maxApiVersionSupported;
@@ -359,18 +410,47 @@ bool COpenXRSession::createSession()
 	return true;
 }
 
-bool COpenXRSession::setupPlaySpace()
+bool COpenXRSession::setupSpaces()
 {
-	XrPosef identity = {
-		.orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0},
-		.position = {.x = 0, .y = 0, .z = 0},
-	};
-	XrReferenceSpaceCreateInfo create_info = {
+	XR_ASSERT(PlaySpace == XR_NULL_HANDLE);
+	XrReferenceSpaceCreateInfo createInfo = {
 		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
 		.referenceSpaceType = PlaySpaceType,
-		.poseInReferenceSpace = identity,
+		.poseInReferenceSpace = PlaySpaceCenter,
 	};
-	XR_CHECK(xrCreateReferenceSpace, Session, &create_info, &PlaySpace);
+	XR_CHECK(xrCreateReferenceSpace, Session, &createInfo, &PlaySpace);
+
+	XR_ASSERT(ViewSpace == XR_NULL_HANDLE);
+	XrReferenceSpaceCreateInfo viewCreateInfo = {
+		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+		.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW,
+		.poseInReferenceSpace = Identity,
+	};
+	XR_CHECK(xrCreateReferenceSpace, Session, &viewCreateInfo, &ViewSpace);
+	return true;
+}
+
+bool COpenXRSession::recenterPlaySpace(XrTime ref)
+{
+	XrSpaceLocation location = {
+		.type = XR_TYPE_SPACE_LOCATION,
+	};
+	XR_CHECK(xrLocateSpace, ViewSpace, PlaySpace, ref, &location);
+	bool validPosition = location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT;
+	bool validOrientation = location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+
+	// Quietly do nothing if there's incomplete data
+	if (!validPosition || !validOrientation)
+		return true;
+
+	PlaySpaceCenter = poseMul(PlaySpaceCenter, location.pose);
+
+	xrDestroySpace(PlaySpace);
+	PlaySpace = XR_NULL_HANDLE;
+	xrDestroySpace(ViewSpace);
+	ViewSpace = XR_NULL_HANDLE;
+	if (!setupSpaces())
+		return false;
 	return true;
 }
 
@@ -426,10 +506,12 @@ bool COpenXRSession::setupSwapchains()
 
 	// Make swapchain and depth swapchain for each view
 	size_t viewCount = ViewConfigs.size();
-	ViewState.resize(viewCount);
+	ViewChains.resize(viewCount);
 	for (size_t viewIndex = 0; viewIndex < viewCount; viewIndex++) {
-		ViewState[viewIndex].Swapchain =
+		auto& viewChain = ViewChains[viewIndex];
+		viewChain.Swapchain =
 			createOpenXRSwapchain(
+				VideoDriver,
 				Instance,
 				Session,
 				XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
@@ -437,10 +519,11 @@ bool COpenXRSession::setupSwapchains()
 				ViewConfigs[viewIndex].recommendedSwapchainSampleCount,
 				ViewConfigs[viewIndex].recommendedImageRectWidth,
 				ViewConfigs[viewIndex].recommendedImageRectHeight);
-		if (!ViewState[viewIndex].Swapchain)
+		if (!viewChain.Swapchain)
 			return false;
-		ViewState[viewIndex].DepthSwapchain =
+		viewChain.DepthSwapchain =
 			createOpenXRSwapchain(
+				VideoDriver,
 				Instance,
 				Session,
 				XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -448,8 +531,11 @@ bool COpenXRSession::setupSwapchains()
 				ViewConfigs[viewIndex].recommendedSwapchainSampleCount,
 				ViewConfigs[viewIndex].recommendedImageRectWidth,
 				ViewConfigs[viewIndex].recommendedImageRectHeight);
-		if (!ViewState[viewIndex].DepthSwapchain)
+		if (!viewChain.DepthSwapchain)
 			return false;
+		size_t swapchainLength = viewChain.Swapchain->getLength();
+		// These are added as needed
+		viewChain.RenderTargets.resize(swapchainLength, nullptr);
 	}
 
 	// Fill in layers
@@ -461,16 +547,16 @@ bool COpenXRSession::setupCompositionLayers()
 {
 	size_t viewCount = ViewConfigs.size();
 	for (size_t viewIndex = 0; viewIndex < viewCount; viewIndex++) {
-		auto& depthInfo = ViewState[viewIndex].DepthInfo;
+		auto& depthInfo = ViewChains[viewIndex].DepthInfo;
 		depthInfo = XrCompositionLayerDepthInfoKHR{
 			.type = XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR,
 			.next = NULL,
 			.minDepth = 0.f,
 			.maxDepth = 1.f,
-			.nearZ = NearZ,
-			.farZ = FarZ,
+			.nearZ = ZNear,
+			.farZ = ZFar,
 		};
-		depthInfo.subImage.swapchain = ViewState[viewIndex].DepthSwapchain->getHandle();
+		depthInfo.subImage.swapchain = ViewChains[viewIndex].DepthSwapchain->getHandle();
 		depthInfo.subImage.imageArrayIndex = 0;
 		depthInfo.subImage.imageRect.offset.x = 0;
 		depthInfo.subImage.imageRect.offset.y = 0;
@@ -479,14 +565,14 @@ bool COpenXRSession::setupCompositionLayers()
 	}
 
 	// Fill out projection views
-	Layers.resize(viewCount);
+	ViewLayers.resize(viewCount);
 	for (size_t viewIndex = 0; viewIndex < viewCount; viewIndex++) {
-		auto& layerInfo = Layers[viewIndex];
+		auto& layerInfo = ViewLayers[viewIndex];
 		layerInfo = XrCompositionLayerProjectionView{
 			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW,
-			.next = &ViewState[viewIndex].DepthInfo,
+			.next = &ViewChains[viewIndex].DepthInfo,
 		};
-		layerInfo.subImage.swapchain = ViewState[viewIndex].Swapchain->getHandle();
+		layerInfo.subImage.swapchain = ViewChains[viewIndex].Swapchain->getHandle();
 		layerInfo.subImage.imageArrayIndex = 0;
 		layerInfo.subImage.imageRect.offset.x = 0;
 		layerInfo.subImage.imageRect.offset.y = 0;
@@ -497,16 +583,30 @@ bool COpenXRSession::setupCompositionLayers()
 	return true;
 }
 
-bool COpenXRSession::TryBeginFrame(int64_t *predicted_time_delta)
+void COpenXRSession::recenter()
 {
+	DoRecenter = true;
+}
 
-	XrFrameState frameState = {
+bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta)
+{
+	XR_ASSERT(!InFrame);
+
+	FrameState = XrFrameState{
 		.type = XR_TYPE_FRAME_STATE,
 	};
 	XrFrameWaitInfo waitInfo = {
 		.type = XR_TYPE_FRAME_WAIT_INFO,
 	};
-	XR_CHECK(xrWaitFrame, Session, &waitInfo, &frameState);
+	XR_CHECK(xrWaitFrame, Session, &waitInfo, &FrameState);
+
+	if (DoRecenter && FrameState.shouldRender) {
+		DoRecenter = false;
+		if (!recenterPlaySpace(FrameState.predictedDisplayTime)) {
+			return false;
+		}
+	}
+
 
 	// TODO: Calculate
 	*predicted_time_delta = 0;
@@ -514,17 +614,173 @@ bool COpenXRSession::TryBeginFrame(int64_t *predicted_time_delta)
 	// TODO: Do hand tracking calculations need to happen in between waiting and beginning the frame?
 	// And xrLocateViews, xrSyncActions, xrGetActionStatePose, xrLocateSpace, xrGetActionStateFloat, xrApplyHapticFeedback, etc
 
+	// Get view location info for this frame
+	XrViewLocateInfo viewLocateInfo = {
+		.type = XR_TYPE_VIEW_LOCATE_INFO,
+		.viewConfigurationType = ViewType,
+		.displayTime = FrameState.predictedDisplayTime,
+		.space = PlaySpace,
+	};
+	uint32_t viewCount = ViewConfigs.size();
+	ViewInfo.resize(viewCount);
+	for (size_t i = 0; i < viewCount; i++) {
+		ViewInfo[i].type = XR_TYPE_VIEW;
+		ViewInfo[i].next = NULL;
+	}
+	ViewState = XrViewState{
+		.type = XR_TYPE_VIEW_STATE,
+		.next = NULL,
+	};
+	XR_CHECK(xrLocateViews, Session, &viewLocateInfo, &ViewState, viewCount, &viewCount, ViewInfo.data());
+	XR_ASSERT(viewCount == ViewConfigs.size());
+
+	// If we're not given position info, assume (0, 0, 0)
+	// I think this happens in seated mode(?)
+	if (!(ViewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT)) {
+		for (uint32_t i = 0; i < viewCount; i++) {
+			ViewInfo[i].pose.position = XrVector3f{.x = 0, .y = 0, .z = 0};
+		}
+	}
+
+	// If we're not given orientation, assume the default.
+	// Tracking must be really broken for this to happen, but let's handle it gracefully
+	if (!(ViewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT)) {
+		for (uint32_t i = 0; i < viewCount; i++) {
+			ViewInfo[i].pose.orientation = XrQuaternionf{.x = 0, .y = 0, .z = 0, .w = 1};
+		}
+	}
+
+	if (FrameState.shouldRender) {
+		// Fill in pose/fov info
+		for (uint32_t i = 0; i < viewCount; i++) {
+			ViewLayers[i].pose = ViewInfo[i].pose;
+			ViewLayers[i].fov = ViewInfo[i].fov;
+		}
+	}
 
 	XrFrameBeginInfo beginInfo = {
 		.type = XR_TYPE_FRAME_BEGIN_INFO,
 	};
 	XR_CHECK(xrBeginFrame, Session, &beginInfo);
+	*didBegin = true;
+	InFrame = true;
+	NextViewIndex = 0;
 	return true;
 }
 
-bool COpenXRSession::NextView(ViewRenderInfo *info)
+bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 {
-	// TODO
+	XR_ASSERT(InFrame);
+	if (FrameState.shouldRender == XR_TRUE) {
+		if (NextViewIndex != 0) {
+			// Release the previous view
+			uint32_t viewIndex = NextViewIndex - 1;
+			auto& viewChain = ViewChains[viewIndex];
+			auto& target = viewChain.RenderTargets[viewChain.Swapchain->getAcquiredIndex()];
+			XR_ASSERT(target->getReferenceCount() == 1);
+			if (!viewChain.Swapchain->release())
+				return false;
+			if (!viewChain.DepthSwapchain->release())
+				return false;
+		}
+		if (NextViewIndex < ViewChains.size()) {
+			uint32_t viewIndex = NextViewIndex++;
+			auto& viewChain = ViewChains[viewIndex];
+			auto& viewConfig = ViewConfigs[viewIndex];
+			if (!viewChain.Swapchain->acquireAndWait())
+				return false;
+			if (!viewChain.DepthSwapchain->acquireAndWait())
+				return false;
+			auto& target = viewChain.RenderTargets[viewChain.Swapchain->getAcquiredIndex()];
+			if (!target) {
+				os::Printer::log("[XR] Adding render target", ELL_INFORMATION);
+				target = VideoDriver->addRenderTarget();
+			}
+			target->setTexture(
+				viewChain.Swapchain->getAcquiredTexture(),
+				viewChain.DepthSwapchain->getAcquiredTexture());
+			const auto& viewInfo = ViewInfo[viewIndex];
+			const auto& fov = viewInfo.fov;
+			const auto& position = viewInfo.pose.position;
+			const auto& orientation = viewInfo.pose.orientation;
+			info->Kind = (viewIndex == 0) ? core::XRVK_LEFT_EYE : core::XRVK_RIGHT_EYE;
+			info->Target = target;
+			info->Width = viewConfig.recommendedImageRectWidth;
+			info->Height = viewConfig.recommendedImageRectHeight;
+			// RH -> LH coordinates
+			info->Position = core::vector3df(position.x, position.y, -position.z);
+			// RH -> LH coordinates + invert
+			info->Orientation = core::quaternion(-orientation.x, -orientation.y, orientation.z, orientation.w);
+			info->AngleLeft = fov.angleLeft;
+			info->AngleRight = fov.angleRight;
+			info->AngleUp = fov.angleUp;
+			info->AngleDown = fov.angleDown;
+			info->ZNear = ZNear;
+			info->ZFar = ZFar;
+			*gotView = true;
+			return true;
+		}
+	}
+
+	// End the frame and submit all layers for rendering
+	if (!endFrame())
+		return false;
+	*gotView = false;
+	NextViewIndex = 0;
+	return true;
+}
+
+static const char* state_label(XrSessionState state)
+{
+	switch (state) {
+	case XR_SESSION_STATE_IDLE: return "idle";
+	case XR_SESSION_STATE_READY: return "ready";
+	case XR_SESSION_STATE_SYNCHRONIZED: return "synchronized";
+	case XR_SESSION_STATE_VISIBLE: return "visible";
+	case XR_SESSION_STATE_FOCUSED: return "focused";
+	case XR_SESSION_STATE_STOPPING: return "stopping";
+	case XR_SESSION_STATE_LOSS_PENDING: return "loss_pending";
+	case XR_SESSION_STATE_EXITING: return "exiting";
+	default: return "Unknown";
+	}
+}
+
+bool COpenXRSession::handleStateChange(XrEventDataSessionStateChanged *ev)
+{
+	const char* label = state_label(ev->state);
+	char buf[128];
+	snprintf_irr(buf, sizeof(buf), "[XR] Session state changed to `%s`", label);
+	os::Printer::log(buf, ELL_INFORMATION);
+	return true;
+}
+
+bool COpenXRSession::endFrame()
+{
+	XR_ASSERT(InFrame);
+	XrCompositionLayerProjection projectionLayer = {
+		.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+		.next = NULL,
+		.layerFlags = 0,
+		.space = PlaySpace,
+		.viewCount = (uint32_t)ViewLayers.size(),
+		.views = ViewLayers.data(),
+	};
+
+	uint32_t layerCount = 0;
+	const XrCompositionLayerBaseHeader* layers[5];
+	if (FrameState.shouldRender) {
+		layers[layerCount++] = (XrCompositionLayerBaseHeader*)&projectionLayer;
+	}
+	XrFrameEndInfo frameEndInfo = {
+		.type = XR_TYPE_FRAME_END_INFO,
+		.next = NULL,
+		.displayTime = FrameState.predictedDisplayTime,
+		.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+		.layerCount = layerCount,
+		.layers = layers,
+	};
+	XR_CHECK(xrEndFrame, Session, &frameEndInfo);
+	InFrame = false;
 	return true;
 }
 
@@ -534,7 +790,7 @@ unique_ptr<IOpenXRSession> createOpenXRSession(
 	XrReferenceSpaceType playSpaceType)
 {
 	unique_ptr<COpenXRSession> obj(new COpenXRSession(instance, driver, playSpaceType));
-	if (!obj->Init())
+	if (!obj->init())
 		return nullptr;
 	return obj;
 }

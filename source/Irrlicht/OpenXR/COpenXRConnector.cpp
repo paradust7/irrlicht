@@ -18,11 +18,12 @@ namespace irr
 class COpenXRConnector : public IOpenXRConnector {
 	public:
 		COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags);
-		bool Init();
+		bool init();
 		virtual ~COpenXRConnector();
-		virtual void HandleEvents() override;
-		virtual bool TryBeginFrame(int64_t *predicted_time_delta) override;
-		virtual bool NextView(ViewRenderInfo *info) override;
+		virtual void handleEvents() override;
+		virtual void recenter() override;
+		virtual bool tryBeginFrame(int64_t *predicted_time_delta) override;
+		virtual bool nextView(core::XrViewInfo* info) override;
 	protected:
 		video::IVideoDriver* VideoDriver;
 		uint32_t ModeFlags;
@@ -31,6 +32,7 @@ class COpenXRConnector : public IOpenXRConnector {
 		// Retry every 10 seconds
 		u32 InstanceRetryInterval = 10 * 1000;
 		u32 InstanceRetryTime = 0;
+		void invalidateInstance();
 };
 
 COpenXRConnector::COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags)
@@ -41,7 +43,7 @@ COpenXRConnector::COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_fl
 	VideoDriver->grab();
 }
 
-bool COpenXRConnector::Init() {
+bool COpenXRConnector::init() {
 	Instance = createOpenXRInstance(VideoDriver, PlaySpaceType);
 	if (!Instance)
 		return false;
@@ -50,18 +52,22 @@ bool COpenXRConnector::Init() {
 
 COpenXRConnector::~COpenXRConnector()
 {
-	// Order matters here
 	Instance = nullptr;
 	VideoDriver->drop();
 }
 
-void COpenXRConnector::HandleEvents()
+void COpenXRConnector::invalidateInstance()
+{
+	os::Printer::log("[XR] Instance lost", ELL_ERROR);
+	Instance = nullptr;
+	InstanceRetryTime = os::Timer::getTime() + InstanceRetryInterval;
+}
+
+void COpenXRConnector::handleEvents()
 {
 	if (Instance) {
-		if (!Instance->HandleEvents()) {
-			// Instance is dead
-			Instance = nullptr;
-			InstanceRetryTime = os::Timer::getTime() + InstanceRetryInterval;
+		if (!Instance->handleEvents()) {
+			invalidateInstance();
 		}
 	} else {
 		u32 now = os::Timer::getTime();
@@ -72,24 +78,40 @@ void COpenXRConnector::HandleEvents()
 	}
 }
 
-bool COpenXRConnector::TryBeginFrame(int64_t *predicted_time_delta)
+void COpenXRConnector::recenter()
 {
-	if (!Instance)
-		return false;
-	return Instance->TryBeginFrame(predicted_time_delta);
+	if (Instance)
+		Instance->recenter();
 }
 
-bool COpenXRConnector::NextView(ViewRenderInfo *info)
+bool COpenXRConnector::tryBeginFrame(int64_t *predicted_time_delta)
 {
 	if (!Instance)
 		return false;
-	return Instance->NextView(info);
+	bool didBegin = false;
+	if (!Instance->internalTryBeginFrame(&didBegin, predicted_time_delta)) {
+		invalidateInstance();
+		return false;
+	}
+	return didBegin;
+}
+
+bool COpenXRConnector::nextView(core::XrViewInfo* info)
+{
+	if (!Instance)
+		return false;
+	bool gotView = false;
+	if (!Instance->internalNextView(&gotView, info)) {
+		invalidateInstance();
+		return false;
+	}
+	return gotView;
 }
 
 unique_ptr<IOpenXRConnector> createOpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags)
 {
 	unique_ptr<COpenXRConnector> conn(new COpenXRConnector(driver, mode_flags));
-	if (!conn->Init())
+	if (!conn->init())
 		return nullptr;
 	return conn;
 }

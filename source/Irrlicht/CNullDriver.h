@@ -21,6 +21,7 @@
 
 namespace irr
 {
+	class COpenXRSwapchain;
 namespace io
 {
 	class IWriteFile;
@@ -341,6 +342,7 @@ namespace video
 		}
 
 	protected:
+		friend class irr::COpenXRSwapchain;
 		struct SHWBufferLink
 		{
 			SHWBufferLink(const scene::IMeshBuffer *_MeshBuffer)
@@ -651,6 +653,8 @@ namespace video
 		virtual ITexture* createDeviceDependentTexture(const io::path& name, IImage* image);
 
 		virtual ITexture* createDeviceDependentTextureCubemap(const io::path& name, const core::array<IImage*>& image);
+
+		virtual ITexture* useDeviceDependentTexture(const io::path& name, E_DRIVER_TYPE driverType, void *textureId, ECOLOR_FORMAT colorFormat, u32 width, u32 height);
 
 		//! checks triangle count and print warning if wrong
 		bool checkPrimitiveCount(u32 prmcnt) const;

@@ -19,19 +19,23 @@ public:
 		: VideoDriver(driver),
 		  PlaySpaceType(playSpaceType)
 	{
+		VideoDriver->grab();
 	}
-	bool Init();
+	bool init();
 	virtual ~COpenXRInstance() override;
-	virtual bool HandleEvents() override;
-	virtual bool TryBeginFrame(int64_t *predicted_time_delta) override;
-	virtual bool NextView(ViewRenderInfo *info) override;
+	virtual bool handleEvents() override;
+	virtual void recenter() override;
+	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) override;
+	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
 protected:
 	bool loadExtensions();
 	bool createInstance();
+	bool tryCreateSession();
 	bool check(XrResult result, const char* func)
 	{
 		return openxr_check(Instance, result, func);
 	}
+	void invalidateSession();
 
 	video::IVideoDriver* VideoDriver;
 	XrReferenceSpaceType PlaySpaceType;
@@ -44,25 +48,33 @@ protected:
 	XrInstanceProperties InstanceProperties;
 
 	unique_ptr<IOpenXRSession> Session;
+	u32 SessionRetryInterval = 10 * 1000;
+	u32 SessionRetryTime = 0;
 };
 
 
-bool COpenXRInstance::Init()
+bool COpenXRInstance::init()
 {
 	if (!loadExtensions()) return false;
 	if (!createInstance()) return false;
 	XR_ASSERT(Instance != XR_NULL_HANDLE);
-	Session = createOpenXRSession(Instance, VideoDriver, PlaySpaceType);
-	if (!Session) return false;
+	if (!tryCreateSession()) return false;
 	return true;
 }
 
 COpenXRInstance::~COpenXRInstance()
 {
-	// Destroy the session first
 	Session = nullptr;
 	if (Instance != XR_NULL_HANDLE)
 		xrDestroyInstance(Instance);
+	VideoDriver->drop();
+}
+
+void COpenXRInstance::invalidateSession()
+{
+	os::Printer::log("[XR] Session lost", ELL_ERROR);
+	Session = nullptr;
+	SessionRetryTime = os::Timer::getTime() + SessionRetryInterval;
 }
 
 bool COpenXRInstance::loadExtensions()
@@ -92,6 +104,11 @@ bool COpenXRInstance::loadExtensions()
 bool COpenXRInstance::createInstance()
 {
 	std::vector<const char*> extensionsToEnable;
+	if (!ExtensionNames.count(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME)) {
+		os::Printer::log("OpenXR runtime does not support depth composition layer");
+		return false;
+	}
+	extensionsToEnable.push_back(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
 
 #ifdef XR_USE_GRAPHICS_API_OPENGL
 	if (!ExtensionNames.count(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)) {
@@ -140,8 +157,17 @@ bool COpenXRInstance::createInstance()
 	return true;
 }
 
-bool COpenXRInstance::HandleEvents()
+bool COpenXRInstance::handleEvents()
 {
+	// Try reviving the session
+	if (!Session) {
+                u32 now = os::Timer::getTime();
+                if (now > SessionRetryTime) {
+			tryCreateSession();
+			SessionRetryTime = now + SessionRetryInterval;
+		}
+	}
+
 	for (;;) {
 		XrEventDataBuffer event = {
 			.type = XR_TYPE_EVENT_DATA_BUFFER,
@@ -151,7 +177,7 @@ bool COpenXRInstance::HandleEvents()
 			// No more events
 			break;
 		} else if (result != XR_SUCCESS) {
-			// Logs an error
+			// Called to log the error
 			check(result, "xrPollEvent");
 			return false;
 		}
@@ -162,27 +188,63 @@ bool COpenXRInstance::HandleEvents()
 		case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
 			os::Printer::log("[XR] Disconnected (lost instance)", ELL_ERROR);
 			return false;
-		case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
-			// TODO
+		case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
+			XrEventDataSessionStateChanged* e = (XrEventDataSessionStateChanged*)&event;
+			if (Session) {
+				if (!Session->handleStateChange(e)) {
+					invalidateSession();
+				}
+			}
 			break;
-		default: break;
+		}
+		default:
+			break;
 		}
 	}
 	return true;
 }
 
-bool COpenXRInstance::TryBeginFrame(int64_t *predicted_time_delta)
+void COpenXRInstance::recenter()
 {
-	if (!Session)
-		return false;
-	return Session->TryBeginFrame(predicted_time_delta);
+	if (Session)
+		Session->recenter();
 }
 
-bool COpenXRInstance::NextView(ViewRenderInfo *info)
+bool COpenXRInstance::tryCreateSession()
 {
+	XR_ASSERT(!Session);
+	Session = createOpenXRSession(Instance, VideoDriver, PlaySpaceType);
 	if (!Session)
 		return false;
-	return Session->NextView(info);
+	return true;
+}
+
+bool COpenXRInstance::internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta)
+{
+	if (!Session) {
+		*didBegin = false;
+		return true;
+	}
+	if (!Session->internalTryBeginFrame(didBegin, predicted_time_delta)) {
+		invalidateSession();
+		*didBegin = false;
+		return true;
+	}
+	return true;
+}
+
+bool COpenXRInstance::internalNextView(bool *gotView, core::XrViewInfo* info)
+{
+	if (!Session) {
+		*gotView = false;
+		return true;
+	}
+	if (!Session->internalNextView(gotView, info)) {
+		invalidateSession();
+		*gotView = false;
+		return true;
+	}
+	return true;
 }
 
 unique_ptr<IOpenXRInstance> createOpenXRInstance(
@@ -190,7 +252,7 @@ unique_ptr<IOpenXRInstance> createOpenXRInstance(
 	XrReferenceSpaceType playSpaceType)
 {
 	unique_ptr<COpenXRInstance> obj(new COpenXRInstance(driver, playSpaceType));
-	if (!obj->Init())
+	if (!obj->init())
 		return nullptr;
 	return obj;
 }

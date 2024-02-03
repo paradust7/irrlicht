@@ -1934,6 +1934,16 @@ ITexture* COpenGLDriver::createDeviceDependentTextureCubemap(const io::path& nam
 	return texture;
 }
 
+ITexture* COpenGLDriver::useDeviceDependentTexture(const io::path& name, E_DRIVER_TYPE driverType, void *textureId, ECOLOR_FORMAT colorFormat, u32 width, u32 height)
+{
+	if (getDriverType() != driverType) {
+		return nullptr;
+	}
+	GLuint textureName = *((GLuint*)textureId);
+	COpenGLTexture* texture = new COpenGLTexture(name, textureName, colorFormat, width, height, this);
+	return texture;
+}
+
 void COpenGLDriver::disableFeature(E_VIDEO_DRIVER_FEATURE feature, bool flag)
 {
 	CNullDriver::disableFeature(feature, flag);

@@ -45,8 +45,23 @@ public:
 		bool IsCached;
 	};
 
+	// Refer to a texture provided by an external library
+	COpenGLCoreTexture(const io::path& name, GLuint textureName, ECOLOR_FORMAT colorFormat, u32 width, u32 height, TOpenGLDriver* driver) : ITexture(name, ETT_2D), Driver(driver), TextureType(GL_TEXTURE_2D),
+		TextureName(textureName), TextureOwned(false), InternalFormat(GL_RGBA), PixelFormat(GL_RGBA), PixelType(GL_UNSIGNED_BYTE), Converter(0), LockReadOnly(false), LockImage(0), LockLayer(0),
+		KeepImage(false), MipLevelStored(0), LegacyAutoGenerateMipMaps(false)
+	{
+		DriverType = Driver->getDriverType();
+		HasMipMaps = false;
+		Size.Width = width;
+		Size.Height = height;
+		OriginalSize = Size;
+		IsRenderTarget = true;
+		OriginalColorFormat = colorFormat;
+		ColorFormat = colorFormat;
+	}
+
 	COpenGLCoreTexture(const io::path& name, const core::array<IImage*>& images, E_TEXTURE_TYPE type, TOpenGLDriver* driver) : ITexture(name, type), Driver(driver), TextureType(GL_TEXTURE_2D),
-		TextureName(0), InternalFormat(GL_RGBA), PixelFormat(GL_RGBA), PixelType(GL_UNSIGNED_BYTE), Converter(0), LockReadOnly(false), LockImage(0), LockLayer(0),
+		TextureName(0), TextureOwned(true), InternalFormat(GL_RGBA), PixelFormat(GL_RGBA), PixelType(GL_UNSIGNED_BYTE), Converter(0), LockReadOnly(false), LockImage(0), LockLayer(0),
 		KeepImage(false), MipLevelStored(0), LegacyAutoGenerateMipMaps(false)
 	{
 		_IRR_DEBUG_BREAK_IF(images.size() == 0)
@@ -149,7 +164,7 @@ public:
 	COpenGLCoreTexture(const io::path& name, const core::dimension2d<u32>& size, E_TEXTURE_TYPE type, ECOLOR_FORMAT format, TOpenGLDriver* driver)
 		: ITexture(name, type),
 		Driver(driver), TextureType(GL_TEXTURE_2D),
-		TextureName(0), InternalFormat(GL_RGBA), PixelFormat(GL_RGBA), PixelType(GL_UNSIGNED_BYTE), Converter(0), LockReadOnly(false), LockImage(0), LockLayer(0), KeepImage(false),
+		TextureName(0), TextureOwned(true), InternalFormat(GL_RGBA), PixelFormat(GL_RGBA), PixelType(GL_UNSIGNED_BYTE), Converter(0), LockReadOnly(false), LockImage(0), LockLayer(0), KeepImage(false),
 		MipLevelStored(0), LegacyAutoGenerateMipMaps(false)
 	{
 		DriverType = Driver->getDriverType();
@@ -219,7 +234,7 @@ public:
 
 	virtual ~COpenGLCoreTexture()
 	{
-		if (TextureName)
+		if (TextureName && TextureOwned)
 			glDeleteTextures(1, &TextureName);
 
 		if (LockImage)
@@ -644,6 +659,7 @@ protected:
 
 	GLenum TextureType;
 	GLuint TextureName;
+	bool TextureOwned;
 	GLint InternalFormat;
 	GLenum PixelFormat;
 	GLenum PixelType;

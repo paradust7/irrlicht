@@ -10,10 +10,12 @@ namespace irr {
 
 class IOpenXRSession {
 public:
-	virtual ~IOpenXRSession() {};
+	virtual ~IOpenXRSession() {}
 
-	virtual bool TryBeginFrame(int64_t *predicted_time_delta) = 0;
-	virtual bool NextView(ViewRenderInfo *info) = 0;
+	virtual void recenter() = 0;
+	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) = 0;
+	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) = 0;
+	virtual bool handleStateChange(XrEventDataSessionStateChanged *ev) = 0;
 };
 
 std::unique_ptr<IOpenXRSession> createOpenXRSession(

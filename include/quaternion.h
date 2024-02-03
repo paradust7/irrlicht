@@ -186,6 +186,9 @@ class quaternion
 		//! Output this quaternion to an Euler angle (radians)
 		void toEuler(vector3df& euler) const;
 
+		//! Output this quaternion to an Euler angle (degrees)
+		void toEulerDeg(vector3df& euler) const;
+
 		//! Set quaternion to identity
 		quaternion& makeIdentity();
 
@@ -691,6 +694,13 @@ inline void quaternion::toEuler(vector3df& euler) const
 	}
 }
 
+inline void quaternion::toEulerDeg(vector3df& euler) const
+{
+	toEuler(euler);
+	euler.X *= core::RADTODEG;
+	euler.Y *= core::RADTODEG;
+	euler.Z *= core::RADTODEG;
+}
 
 inline vector3df quaternion::operator* (const vector3df& v) const
 {

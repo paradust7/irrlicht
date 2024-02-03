@@ -14,9 +14,10 @@ namespace irr {
 class IOpenXRInstance {
 public:
 	virtual ~IOpenXRInstance() {}
-	virtual bool HandleEvents() = 0;
-	virtual bool TryBeginFrame(int64_t *predicted_time_delta) = 0;
-	virtual bool NextView(ViewRenderInfo *info) = 0;
+	virtual bool handleEvents() = 0;
+	virtual void recenter() = 0;
+	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) = 0;
+	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) = 0;
 };
 
 std::unique_ptr<IOpenXRInstance> createOpenXRInstance(

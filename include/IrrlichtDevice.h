@@ -15,6 +15,7 @@
 #include "ITimer.h"
 #include "IOSOperator.h"
 #include "IrrCompileConfig.h"
+#include "XrViewInfo.h"
 
 namespace irr
 {
@@ -331,6 +332,30 @@ namespace irr
 		{
 			return video::isDriverSupported(driver);
 		}
+
+		//! Returns true if this is the OpenXR driver
+		virtual bool hasXR() const = 0;
+
+		//! Re-center the playspace before the next frame.
+		/** This makes the current HMD position and orientation equivalent to
+		    position = (0, 0, 0) and rotation = identity quaternion.
+		*/
+		virtual void recenterXR() = 0;
+
+		//! Signal that the app is rendering XR
+		virtual void startXR() = 0;
+
+		//! Try to start a frame.
+		//! If the frame should be skipped, returns false.
+		//! This will block until the frame is ready to be drawn.
+		virtual bool beginFrame() = 0;
+
+		//! Get the next view to render
+		//! Returns false when all views are finished, and the frame is over.
+		virtual bool nextView(core::XrViewInfo* info) = 0;
+
+		//! Signal that the app will no longer be rendering frames
+		virtual void stopXR() = 0;
 	};
 
 } // end namespace irr
