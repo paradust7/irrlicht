@@ -138,12 +138,9 @@ bool COpenXRSwapchain::init()
 		Images[i] = images[i].image;
 	}
 
-	// Populate the Irrlicht structures associated with these images
-	video::CNullDriver* driver = dynamic_cast<video::CNullDriver*>(VideoDriver);
-
 	Textures.resize(swapchainLength);
 	for (uint32_t i = 0; i < swapchainLength; ++i) {
-		Textures[i] = driver->useDeviceDependentTexture(
+		Textures[i] = VideoDriver->useDeviceDependentTexture(
 			"openxr_swapchain",
 			driverType,
 			&Images[i],

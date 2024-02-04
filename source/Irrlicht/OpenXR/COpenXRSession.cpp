@@ -9,12 +9,6 @@
 
 #include <SDL_video.h>
 
-#ifdef WIN32
-#ifndef PRId64
-#define PRId64 "%I64d"
-#endif
-#endif
-
 using std::unique_ptr;
 
 namespace irr {
@@ -495,11 +489,11 @@ bool COpenXRSession::setupSwapchains()
 	}
 	char buf[128];
 	snprintf_irr(buf, sizeof(buf),
-		"[XR] ColorFormat %" PRId64 " (%s)", ColorFormat,
+		"[XR] ColorFormat %d (%s)", (int32_t)ColorFormat,
 		(ColorFormat == GL_SRGB8_ALPHA8) ? "GL_SRGB8_ALPHA8" : "unknown");
 	os::Printer::log(buf, ELL_INFORMATION);
 	snprintf_irr(buf, sizeof(buf),
-		"[XR] DepthFormat %" PRId64 " (%s)", DepthFormat,
+		"[XR] DepthFormat %d (%s)", (int32_t)DepthFormat,
 		(ColorFormat == GL_DEPTH_COMPONENT32F) ? "GL_DEPTH_COMPONENT32F" : "unknown");
 	os::Printer::log(buf, ELL_INFORMATION);
 	if (ColorFormat != preferred_format) {

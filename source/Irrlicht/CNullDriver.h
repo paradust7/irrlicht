@@ -341,6 +341,8 @@ namespace video
 			return false;
 		}
 
+		ITexture* useDeviceDependentTexture(const io::path& name, E_DRIVER_TYPE driverType, void *textureId, ECOLOR_FORMAT colorFormat, u32 width, u32 height) override;
+
 	protected:
 		friend class irr::COpenXRSwapchain;
 		struct SHWBufferLink
@@ -653,8 +655,6 @@ namespace video
 		virtual ITexture* createDeviceDependentTexture(const io::path& name, IImage* image);
 
 		virtual ITexture* createDeviceDependentTextureCubemap(const io::path& name, const core::array<IImage*>& image);
-
-		virtual ITexture* useDeviceDependentTexture(const io::path& name, E_DRIVER_TYPE driverType, void *textureId, ECOLOR_FORMAT colorFormat, u32 width, u32 height);
 
 		//! checks triangle count and print warning if wrong
 		bool checkPrimitiveCount(u32 prmcnt) const;
