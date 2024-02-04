@@ -9,6 +9,12 @@
 
 #include <SDL_video.h>
 
+#ifdef WIN32
+#ifndef PRId64
+#define PRId64 "%I64d"
+#endif
+#endif
+
 using std::unique_ptr;
 
 namespace irr {
