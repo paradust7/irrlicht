@@ -915,6 +915,10 @@ bool CWebGL1Driver::getColorFormatParameters(ECOLOR_FORMAT format, GLint& intern
 				pixelType = GL_UNSIGNED_INT;
 			}
 			break;
+		case ECF_D32F:
+			// TODO(paradust)
+			abort();
+			break;
 		case ECF_D24S8:
 			if (WebGLExtensions.queryWebGLFeature(CWebGLExtensionHandler::IRR_WEBGL_depth_texture))
 			{

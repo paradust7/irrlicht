@@ -2634,6 +2634,10 @@ COGLES2Driver::~COGLES2Driver()
 			}
 #endif
 			break;
+		case ECF_D32F:
+			// TODO(paradust)
+			abort();
+			break;
 		case ECF_D24S8:
 #ifdef GL_OES_packed_depth_stencil
 			if (queryGLESFeature(COGLESCoreExtensionHandler::IRR_GL_OES_packed_depth_stencil))

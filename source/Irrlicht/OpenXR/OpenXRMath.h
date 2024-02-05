@@ -53,6 +53,26 @@ static inline XrVector3f vecAdd(const XrVector3f& a, const XrVector3f& b)
 	return result;
 }
 
+static inline XrVector3f vecSub(const XrVector3f& a, const XrVector3f& b)
+{
+	XrVector3f result = {
+		.x = a.x - b.x,
+		.y = a.y - b.y,
+		.z = a.z - b.z,
+	};
+	return result;
+}
+
+static inline float vecLengthSq(const XrVector3f& a)
+{
+	return a.x * a.x + a.y * a.y + a.z * a.z;
+}
+
+static inline float vecLength(const XrVector3f& a)
+{
+	return sqrt(vecLengthSq(a));
+}
+
 static inline XrQuaternionf quatNormalize(const XrQuaternionf& a)
 {
 	float invlen = 1.0 / sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w);

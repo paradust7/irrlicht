@@ -494,7 +494,7 @@ bool COpenXRSession::setupSwapchains()
 	os::Printer::log(buf, ELL_INFORMATION);
 	snprintf_irr(buf, sizeof(buf),
 		"[XR] DepthFormat %d (%s)", (int32_t)DepthFormat,
-		(ColorFormat == GL_DEPTH_COMPONENT32F) ? "GL_DEPTH_COMPONENT32F" : "unknown");
+		(ColorFormat == GL_DEPTH_COMPONENT32) ? "GL_DEPTH_COMPONENT32" : "unknown");
 	os::Printer::log(buf, ELL_INFORMATION);
 	if (ColorFormat != preferred_format) {
 		os::Printer::log("[XR] Using non-preferred color format", ELL_WARNING);

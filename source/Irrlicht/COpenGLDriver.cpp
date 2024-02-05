@@ -4007,6 +4007,12 @@ bool COpenGLDriver::getColorFormatParameters(ECOLOR_FORMAT format, GLint& intern
 		pixelFormat = GL_DEPTH_COMPONENT;
 		pixelType = GL_UNSIGNED_INT;
 		break;
+	case ECF_D32F:
+		supported = true;
+		internalFormat = GL_DEPTH_COMPONENT32F;
+		pixelFormat = GL_DEPTH_COMPONENT;
+		pixelType = GL_FLOAT;
+		break;
 	case ECF_D24S8:
 #ifdef GL_VERSION_3_0
 		if (Version >= 300)

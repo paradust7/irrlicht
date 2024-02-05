@@ -388,6 +388,8 @@ public:
 			return 16;
 		case ECF_D32:
 			return 32;
+		case ECF_D32F:
+			return 32;
 		case ECF_D24S8:
 			return 32;
 		case ECF_R8:
@@ -495,6 +497,7 @@ public:
 		{
 			case ECF_D16:
 			case ECF_D32:
+			case ECF_D32F:
 			case ECF_D24S8:
 				return true;
 			default:

@@ -144,7 +144,7 @@ bool COpenXRSwapchain::init()
 			"openxr_swapchain",
 			driverType,
 			&Images[i],
-			(UsageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) ? video::ECF_D32 : video::ECF_A8R8G8B8,
+			(UsageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) ? video::ECF_D32F : video::ECF_A8R8G8B8,
 			Width, Height);
 		XR_ASSERT(Textures[i] != nullptr);
 	}
