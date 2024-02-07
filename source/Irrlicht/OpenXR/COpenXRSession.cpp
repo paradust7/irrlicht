@@ -90,7 +90,8 @@ protected:
 
 	// Set by setupSpaces()
 	XrSpace PlaySpace = XR_NULL_HANDLE;
-	XrPosef PlaySpaceCenter = Identity;
+	XrPosef PlaySpaceOffset = Identity;
+	float YawOffset = 0.0f;
 	XrSpace ViewSpace = XR_NULL_HANDLE;
 	bool DoRecenter = false;
 
@@ -418,7 +419,7 @@ bool COpenXRSession::setupSpaces()
 	XrReferenceSpaceCreateInfo createInfo = {
 		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
 		.referenceSpaceType = PlaySpaceType,
-		.poseInReferenceSpace = PlaySpaceCenter,
+		.poseInReferenceSpace = PlaySpaceOffset,
 	};
 	XR_CHECK(xrCreateReferenceSpace, Session, &createInfo, &PlaySpace);
 
@@ -445,8 +446,12 @@ bool COpenXRSession::recenterPlaySpace(XrTime ref)
 	if (!validPosition || !validOrientation)
 		return true;
 
-	PlaySpaceCenter = poseMul(PlaySpaceCenter, location.pose);
-
+	// For recentering, only the 'yaw' matters, because the runtime guarantees
+	// that the XZ plane is parallel with the floor.
+	XrVector3f forward = quatApply(location.pose.orientation, XrVector3f{0, 0, 1});
+	float yaw = atan2f(forward.x, forward.z);
+	YawOffset = fmodf(YawOffset + yaw, 2 * M_PI);
+	PlaySpaceOffset.orientation = XrQuaternionf{0, sinf(YawOffset/2), 0, cosf(YawOffset/2)};
 	xrDestroySpace(PlaySpace);
 	PlaySpace = XR_NULL_HANDLE;
 	xrDestroySpace(ViewSpace);
