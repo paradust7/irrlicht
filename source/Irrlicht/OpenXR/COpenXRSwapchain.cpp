@@ -6,6 +6,20 @@
 #include "Common.h"
 #include "CNullDriver.h"
 
+/* TODO(paradust): Debugging feature
+
+#include <iostream>
+#include <cstdio>
+#include "mt_opengl.h"
+
+#include "CWriteFile.h"
+#include "IImage.h"
+#include "CImage.h"
+#include "CImageWriterPNG.h"
+#include "IWriteFile.h"
+#include "CWriteFile.h"
+*/
+
 #ifdef XR_USE_GRAPHICS_API_OPENGL
 #include "COpenGLCommon.h"
 #endif
@@ -190,6 +204,53 @@ bool COpenXRSwapchain::release()
 	//XR_ASSERT(Textures[AcquiredIndex]->getReferenceCount() == 1);
 
 	glFinish();
+
+/* TODO(paradust): Integrate this as a debugging feature
+
+	bool isdepth = UsageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	size_t bufSize = Width * Height * (isdepth ? sizeof(float) : sizeof(u32));
+	u8* buf = new u8[bufSize];
+	GL.GetTextureImage(Images[AcquiredIndex], 0, isdepth ? GL_DEPTH_COMPONENT : GL_BGRA, isdepth ? GL_FLOAT : GL_UNSIGNED_BYTE, bufSize, buf);
+	XR_ASSERT(glGetError() == GL_NO_ERROR);
+
+	if (isdepth) {
+		for (int i = 0; i < bufSize; i += 4) {
+			float v = *((float*)&buf[i]);
+			if (v < 0.0f) v = 0.0f;
+			if (v > 1.0f) v = 1.0f;
+			u32 vbyte = (u32)(255.0f * v);
+			*((u32*)&buf[i]) = (vbyte << 16) | (vbyte << 8) | vbyte | 0xFF000000;
+		}
+	}
+	// Data needs to be flipped vertically
+	size_t pitch = Width * 4;
+	for (int y = 0; y < Height/2; y++) {
+		if (y != Height - 1 - y) {
+			std::swap_ranges(&buf[pitch*y + 0], &buf[pitch*y + pitch], &buf[pitch*(Height - 1 - y) + 0]);
+		}
+	}
+
+	video::IImage* img = new video::CImage(video::ECF_A8R8G8B8, core::dimension2d<u32>(Width, Height), buf, true, true);
+
+	char fname[128];
+	snprintf_irr(fname, sizeof(fname), "eye%d.%lu.%s.png", eye, (unsigned long)frame, isdepth ? "depth" : "color");
+
+	io::IWriteFile* fp = io::CWriteFile::createWriteFile(fname, false);
+	XR_ASSERT(fp);
+	video::IImageWriter* writer = new video::CImageWriterPNG;
+	writer->writeImage(fp, img);
+	writer->drop();
+	fp->drop();
+	img->drop();
+	std::cout << "WROTE " << fname << std::endl;
+
+	if (UsageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+		std::cout << "RELEASED depth index " << AcquiredIndex << " with texture id " << Images[AcquiredIndex] << std::endl;
+	} else {
+		std::cout << "RELEASED color index " << AcquiredIndex << " with texture id " << Images[AcquiredIndex] << std::endl;
+	}
+
+*/
 
 	XrSwapchainImageReleaseInfo releaseInfo = {
 		.type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO,

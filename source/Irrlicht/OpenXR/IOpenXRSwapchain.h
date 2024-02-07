@@ -34,8 +34,6 @@ public:
 	virtual video::ITexture* getAcquiredTexture() = 0;
 
 	// Release the swapchain.
-	// glFinish() must be called before this,
-	// or else there will be chaos!
 	virtual bool release() = 0;
 };
 

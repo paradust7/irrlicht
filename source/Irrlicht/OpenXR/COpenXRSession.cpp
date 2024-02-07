@@ -11,6 +11,8 @@
 
 using std::unique_ptr;
 
+uint64_t XrFrameCounter = 0;
+
 namespace irr {
 
 class COpenXRSession : public IOpenXRSession {
@@ -494,7 +496,7 @@ bool COpenXRSession::setupSwapchains()
 	os::Printer::log(buf, ELL_INFORMATION);
 	snprintf_irr(buf, sizeof(buf),
 		"[XR] DepthFormat %d (%s)", (int32_t)DepthFormat,
-		(ColorFormat == GL_DEPTH_COMPONENT32) ? "GL_DEPTH_COMPONENT32" : "unknown");
+		(ColorFormat == GL_DEPTH_COMPONENT32F) ? "GL_DEPTH_COMPONENT32F" : "unknown");
 	os::Printer::log(buf, ELL_INFORMATION);
 	if (ColorFormat != preferred_format) {
 		os::Printer::log("[XR] Using non-preferred color format", ELL_WARNING);
@@ -570,7 +572,8 @@ bool COpenXRSession::setupCompositionLayers()
 		auto& layerInfo = ViewLayers[viewIndex];
 		layerInfo = XrCompositionLayerProjectionView{
 			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW,
-			.next = &ViewChains[viewIndex].DepthInfo,
+			.next = NULL, // &ViewChains[viewIndex].DepthInfo,
+			// TODO(paradust): Determine why this breaks SteamVR
 		};
 		layerInfo.subImage.swapchain = ViewChains[viewIndex].Swapchain->getHandle();
 		layerInfo.subImage.imageArrayIndex = 0;
@@ -599,6 +602,14 @@ bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_ti
 		.type = XR_TYPE_FRAME_WAIT_INFO,
 	};
 	XR_CHECK(xrWaitFrame, Session, &waitInfo, &FrameState);
+
+	XrFrameBeginInfo beginInfo = {
+		.type = XR_TYPE_FRAME_BEGIN_INFO,
+	};
+	XR_CHECK(xrBeginFrame, Session, &beginInfo);
+	*didBegin = true;
+	InFrame = true;
+	NextViewIndex = 0;
 
 	if (DoRecenter && FrameState.shouldRender) {
 		DoRecenter = false;
@@ -634,20 +645,11 @@ bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_ti
 	XR_CHECK(xrLocateViews, Session, &viewLocateInfo, &ViewState, viewCount, &viewCount, ViewInfo.data());
 	XR_ASSERT(viewCount == ViewConfigs.size());
 
-	// If we're not given position info, assume (0, 0, 0)
-	// I think this happens in seated mode(?)
-	if (!(ViewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT)) {
-		for (uint32_t i = 0; i < viewCount; i++) {
-			ViewInfo[i].pose.position = XrVector3f{.x = 0, .y = 0, .z = 0};
-		}
-	}
+	bool validPositions = ViewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT;
+	bool validOrientations = ViewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT;
 
-	// If we're not given orientation, assume the default.
-	// Tracking must be really broken for this to happen, but let's handle it gracefully
-	if (!(ViewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT)) {
-		for (uint32_t i = 0; i < viewCount; i++) {
-			ViewInfo[i].pose.orientation = XrQuaternionf{.x = 0, .y = 0, .z = 0, .w = 1};
-		}
+	if (!validPositions || !validOrientations) {
+		FrameState.shouldRender = false;
 	}
 
 	if (FrameState.shouldRender) {
@@ -657,14 +659,6 @@ bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_ti
 			ViewLayers[i].fov = ViewInfo[i].fov;
 		}
 	}
-
-	XrFrameBeginInfo beginInfo = {
-		.type = XR_TYPE_FRAME_BEGIN_INFO,
-	};
-	XR_CHECK(xrBeginFrame, Session, &beginInfo);
-	*didBegin = true;
-	InFrame = true;
-	NextViewIndex = 0;
 	return true;
 }
 
@@ -672,17 +666,6 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 {
 	XR_ASSERT(InFrame);
 	if (FrameState.shouldRender == XR_TRUE) {
-		if (NextViewIndex != 0) {
-			// Release the previous view
-			uint32_t viewIndex = NextViewIndex - 1;
-			auto& viewChain = ViewChains[viewIndex];
-			auto& target = viewChain.RenderTargets[viewChain.Swapchain->getAcquiredIndex()];
-			XR_ASSERT(target->getReferenceCount() == 1);
-			if (!viewChain.Swapchain->release())
-				return false;
-			if (!viewChain.DepthSwapchain->release())
-				return false;
-		}
 		if (NextViewIndex < ViewChains.size()) {
 			uint32_t viewIndex = NextViewIndex++;
 			auto& viewChain = ViewChains[viewIndex];
@@ -720,6 +703,18 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 			*gotView = true;
 			return true;
 		}
+
+		// If we're here, we're about to end frame. So release all the swapchains.
+		for (uint32_t viewIndex = 0; viewIndex < ViewChains.size(); ++viewIndex) {
+			auto& viewChain = ViewChains[viewIndex];
+			auto& target = viewChain.RenderTargets[viewChain.Swapchain->getAcquiredIndex()];
+			XR_ASSERT(target->getReferenceCount() == 1);
+			if (!viewChain.Swapchain->release())
+				return false;
+			if (!viewChain.DepthSwapchain->release())
+				return false;
+		}
+
 	}
 
 	// End the frame and submit all layers for rendering
@@ -781,6 +776,7 @@ bool COpenXRSession::endFrame()
 	};
 	XR_CHECK(xrEndFrame, Session, &frameEndInfo);
 	InFrame = false;
+	++XrFrameCounter;
 	return true;
 }
 
