@@ -20,6 +20,8 @@ class COpenXRConnector : public IOpenXRConnector {
 		COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags);
 		bool init();
 		virtual ~COpenXRConnector();
+		virtual void startXR() override;
+		virtual void stopXR() override;
 		virtual void handleEvents() override;
 		virtual void recenter() override;
 		virtual bool tryBeginFrame(int64_t *predicted_time_delta) override;
@@ -32,7 +34,12 @@ class COpenXRConnector : public IOpenXRConnector {
 		// Retry every 10 seconds
 		u32 InstanceRetryInterval = 10 * 1000;
 		u32 InstanceRetryTime = 0;
+		bool AppReady = false;
 		void invalidateInstance();
+
+		// Used to prevent automatic instance recreation
+		// after the runtime forces exit.
+		bool InstanceExited = false;
 };
 
 COpenXRConnector::COpenXRConnector(video::IVideoDriver* driver, uint32_t mode_flags)
@@ -56,6 +63,23 @@ COpenXRConnector::~COpenXRConnector()
 	VideoDriver->drop();
 }
 
+void COpenXRConnector::startXR()
+{
+	XR_ASSERT(!AppReady);
+	AppReady = true;
+	InstanceExited = false;
+	if (Instance)
+		Instance->setAppReady(true);
+}
+
+void COpenXRConnector::stopXR()
+{
+	XR_ASSERT(AppReady);
+	AppReady = false;
+	if (Instance)
+		Instance->setAppReady(false);
+}
+
 void COpenXRConnector::invalidateInstance()
 {
 	os::Printer::log("[XR] Instance lost", ELL_ERROR);
@@ -65,16 +89,23 @@ void COpenXRConnector::invalidateInstance()
 
 void COpenXRConnector::handleEvents()
 {
-	if (Instance) {
-		if (!Instance->handleEvents()) {
-			invalidateInstance();
-		}
-	} else {
+	if (!Instance) {
+		if (InstanceExited)
+			return;
 		u32 now = os::Timer::getTime();
 		if (now > InstanceRetryTime) {
 			Instance = createOpenXRInstance(VideoDriver, PlaySpaceType);
 			InstanceRetryTime = now + InstanceRetryInterval;
+			if (Instance && AppReady) {
+				Instance->setAppReady(true);
+			}
 		}
+	}
+	if (!Instance)
+		return;
+	if (!Instance->handleEvents()) {
+		invalidateInstance();
+		InstanceExited = true;
 	}
 }
 

@@ -68,6 +68,7 @@ void CIrrDeviceXR::recenterXR()
 
 void CIrrDeviceXR::startXR()
 {
+	Connector->startXR();
 }
 
 bool CIrrDeviceXR::beginFrame()
@@ -88,6 +89,7 @@ bool CIrrDeviceXR::nextView(core::XrViewInfo* info)
 
 void CIrrDeviceXR::stopXR()
 {
+	Connector->stopXR();
 }
 
 } // namespace irr

@@ -23,6 +23,7 @@ public:
 	}
 	bool init();
 	virtual ~COpenXRInstance() override;
+	virtual void setAppReady(bool ready) override;
 	virtual bool handleEvents() override;
 	virtual void recenter() override;
 	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) override;
@@ -48,8 +49,9 @@ protected:
 	XrInstanceProperties InstanceProperties;
 
 	unique_ptr<IOpenXRSession> Session;
-	u32 SessionRetryInterval = 10 * 1000;
+	u32 SessionRetryInterval = 5 * 1000;
 	u32 SessionRetryTime = 0;
+	bool AppReady = false;
 };
 
 
@@ -157,6 +159,18 @@ bool COpenXRInstance::createInstance()
 	return true;
 }
 
+void COpenXRInstance::setAppReady(bool ready)
+{
+	AppReady = ready;
+	if (Session) {
+		if (!Session->setAppReady(ready)) {
+			// Session has to destroy itself to do fast termination.
+			invalidateSession();
+			SessionRetryTime = os::Timer::getTime();
+		}
+	}
+}
+
 bool COpenXRInstance::handleEvents()
 {
 	// Try reviving the session
@@ -165,6 +179,9 @@ bool COpenXRInstance::handleEvents()
                 if (now > SessionRetryTime) {
 			tryCreateSession();
 			SessionRetryTime = now + SessionRetryInterval;
+			if (Session && AppReady) {
+				Session->setAppReady(AppReady);
+			}
 		}
 	}
 
@@ -194,6 +211,10 @@ bool COpenXRInstance::handleEvents()
 				if (!Session->handleStateChange(e)) {
 					invalidateSession();
 				}
+			}
+			if (e->state == XR_SESSION_STATE_EXITING) {
+				// Force instance destroy
+				return false;
 			}
 			break;
 		}

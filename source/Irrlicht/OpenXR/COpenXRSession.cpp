@@ -45,6 +45,7 @@ public:
 		VideoDriver->drop();
 	}
 
+	virtual bool setAppReady(bool ready) override;
 	virtual void recenter() override;
 	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) override;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
@@ -58,9 +59,13 @@ protected:
 	bool verifyGraphics();
 	bool createSession();
 	bool setupSpaces();
-	bool beginSession();
 	bool setupSwapchains();
 	bool setupCompositionLayers();
+
+
+	bool beginSession();
+	bool waitFrame();
+	bool endSession();
 
 	bool recenterPlaySpace(XrTime ref);
 
@@ -126,6 +131,11 @@ protected:
 	// Initialized by setupCompositionLayers
 	std::vector<XrCompositionLayerProjectionView> ViewLayers;
 
+	XrSessionState SessionState = XR_SESSION_STATE_IDLE;
+	bool Running = false;
+	bool AppReady = false;
+	bool DidWaitFrame = false;
+
 	// ----------------------------------------------
 	// These are only valid when InFrame is true
 	bool InFrame = false;
@@ -150,7 +160,6 @@ bool COpenXRSession::init()
 	if (!createSession()) return false;
 	// TODO: Initialize hand tracking
 	if (!setupSpaces()) return false;
-	if (!beginSession()) return false;
 	if (!setupSwapchains()) return false;
 	if (!setupCompositionLayers()) return false;
 	// TODO: Setup actions
@@ -463,11 +472,38 @@ bool COpenXRSession::recenterPlaySpace(XrTime ref)
 
 bool COpenXRSession::beginSession()
 {
+	XR_ASSERT(!Running);
 	XrSessionBeginInfo session_begin_info = {
 		.type = XR_TYPE_SESSION_BEGIN_INFO,
 		.primaryViewConfigurationType = ViewType,
 	};
 	XR_CHECK(xrBeginSession, Session, &session_begin_info);
+	Running = true;
+	return true;
+}
+
+bool COpenXRSession::endSession()
+{
+	XR_ASSERT(Running);
+	XR_ASSERT(!InFrame);
+	XR_ASSERT(SessionState == XR_SESSION_STATE_STOPPING);
+	XR_CHECK(xrEndSession, Session);
+	Running = false;
+	DidWaitFrame = false;
+	return true;
+}
+
+bool COpenXRSession::waitFrame()
+{
+	XR_ASSERT(!DidWaitFrame);
+	FrameState = XrFrameState{
+		.type = XR_TYPE_FRAME_STATE,
+	};
+	XrFrameWaitInfo waitInfo = {
+		.type = XR_TYPE_FRAME_WAIT_INFO,
+	};
+	XR_CHECK(xrWaitFrame, Session, &waitInfo, &FrameState);
+	DidWaitFrame = true;
 	return true;
 }
 
@@ -591,6 +627,23 @@ bool COpenXRSession::setupCompositionLayers()
 	return true;
 }
 
+bool COpenXRSession::setAppReady(bool ready)
+{
+	XR_ASSERT(!InFrame);
+	AppReady = ready;
+	if (!AppReady && Running) {
+		// OpenXR 1.0 spec is very clear that xrEndSession can be called at any time:
+		//
+		// "Calling xrEndSession always transitions a session to the not running state,
+		// regardless of any errors returned."
+		//
+		// Unfortunately, both Monado and OpenXR-CTS missed this detail. So the only
+		// option is to destroy the session.
+		return false;
+	}
+	return true;
+}
+
 void COpenXRSession::recenter()
 {
 	DoRecenter = true;
@@ -599,14 +652,22 @@ void COpenXRSession::recenter()
 bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta)
 {
 	XR_ASSERT(!InFrame);
+	// App should not send us frames except in between startXR() and stopXR()
+	XR_ASSERT(AppReady);
 
-	FrameState = XrFrameState{
-		.type = XR_TYPE_FRAME_STATE,
-	};
-	XrFrameWaitInfo waitInfo = {
-		.type = XR_TYPE_FRAME_WAIT_INFO,
-	};
-	XR_CHECK(xrWaitFrame, Session, &waitInfo, &FrameState);
+	if (!Running) {
+		if (SessionState != XR_SESSION_STATE_READY) {
+			*didBegin = false;
+			return true;
+		}
+		if (!beginSession())
+			return false;
+
+		if (!waitFrame())
+			return false;
+	}
+	XR_ASSERT(Running);
+	XR_ASSERT(DidWaitFrame);
 
 	XrFrameBeginInfo beginInfo = {
 		.type = XR_TYPE_FRAME_BEGIN_INFO,
@@ -747,10 +808,20 @@ static const char* state_label(XrSessionState state)
 
 bool COpenXRSession::handleStateChange(XrEventDataSessionStateChanged *ev)
 {
+	if (ev->session != Session) {
+		// Stale message. Not sure if this can actually happen, but ignore just in case.
+		os::Printer::log("[XR] Received stale session change message", ELL_INFORMATION);
+		return true;
+	}
 	const char* label = state_label(ev->state);
 	char buf[128];
 	snprintf_irr(buf, sizeof(buf), "[XR] Session state changed to `%s`", label);
 	os::Printer::log(buf, ELL_INFORMATION);
+	SessionState = ev->state;
+	if (SessionState == XR_SESSION_STATE_STOPPING) {
+		if (!endSession())
+			return false;
+	}
 	return true;
 }
 
@@ -781,7 +852,13 @@ bool COpenXRSession::endFrame()
 	};
 	XR_CHECK(xrEndFrame, Session, &frameEndInfo);
 	InFrame = false;
+	DidWaitFrame = false;
 	++XrFrameCounter;
+
+	// Schedule the next frame
+	if (!waitFrame())
+		return false;
+
 	return true;
 }
 

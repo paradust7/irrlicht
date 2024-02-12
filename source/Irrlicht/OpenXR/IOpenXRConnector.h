@@ -36,6 +36,12 @@ class IOpenXRConnector {
 public:
 	virtual ~IOpenXRConnector() {}
 
+	// Register that the app is ready to start delivering frames
+	virtual void startXR() = 0;
+
+	// Register that the app is no longer delivering frames
+	virtual void stopXR() = 0;
+
 	// Handles all pending events. Returns when the event queue is empty.
 	// This needs to be called at least once between frames (not during a frame).
 	// If the event queue overflows, events are lost.

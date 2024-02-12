@@ -12,6 +12,7 @@ class IOpenXRSession {
 public:
 	virtual ~IOpenXRSession() {}
 
+	virtual bool setAppReady(bool ready) = 0;
 	virtual void recenter() = 0;
 	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) = 0;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) = 0;

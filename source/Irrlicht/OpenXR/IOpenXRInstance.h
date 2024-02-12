@@ -14,6 +14,7 @@ namespace irr {
 class IOpenXRInstance {
 public:
 	virtual ~IOpenXRInstance() {}
+	virtual void setAppReady(bool ready) = 0;
 	virtual bool handleEvents() = 0;
 	virtual void recenter() = 0;
 	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) = 0;
