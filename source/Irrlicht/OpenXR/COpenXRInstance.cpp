@@ -26,7 +26,7 @@ public:
 	virtual void setAppReady(bool ready) override;
 	virtual bool handleEvents() override;
 	virtual void recenter() override;
-	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) override;
+	virtual bool internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config) override;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
 protected:
 	bool loadExtensions();
@@ -240,13 +240,13 @@ bool COpenXRInstance::tryCreateSession()
 	return true;
 }
 
-bool COpenXRInstance::internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta)
+bool COpenXRInstance::internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config)
 {
 	if (!Session) {
 		*didBegin = false;
 		return true;
 	}
-	if (!Session->internalTryBeginFrame(didBegin, predicted_time_delta)) {
+	if (!Session->internalTryBeginFrame(didBegin, config)) {
 		invalidateSession();
 		*didBegin = false;
 		return true;

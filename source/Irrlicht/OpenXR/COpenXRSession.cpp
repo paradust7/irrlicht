@@ -28,14 +28,10 @@ public:
 	virtual ~COpenXRSession() {
 		// Order is important!
 		ViewLayers.clear();
-		for (auto& viewChain : ViewChains) {
-			for (auto target : viewChain.RenderTargets) {
-				if (target)
-					VideoDriver->removeRenderTarget(target);
-			}
-			viewChain.RenderTargets.clear();
-		}
-		ViewChains.clear();
+		resetViewChains();
+		resetHudChain();
+		if (BasePlaySpace != XR_NULL_HANDLE)
+			xrDestroySpace(BasePlaySpace);
 		if (ViewSpace != XR_NULL_HANDLE)
 			xrDestroySpace(ViewSpace);
 		if (PlaySpace != XR_NULL_HANDLE)
@@ -47,7 +43,7 @@ public:
 
 	virtual bool setAppReady(bool ready) override;
 	virtual void recenter() override;
-	virtual bool internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta) override;
+	virtual bool internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config) override;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
 	virtual bool handleStateChange(XrEventDataSessionStateChanged *ev) override;
 	bool init();
@@ -59,9 +55,12 @@ protected:
 	bool verifyGraphics();
 	bool createSession();
 	bool setupSpaces();
-	bool setupSwapchains();
+	bool setupViewChains();
+	bool setupHudChain();
 	bool setupCompositionLayers();
 
+	void resetViewChains();
+	void resetHudChain();
 
 	bool beginSession();
 	bool waitFrame();
@@ -88,14 +87,14 @@ protected:
 	XrViewConfigurationType ViewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	std::vector<XrViewConfigurationView> ViewConfigs;
 
-	static constexpr XrPosef Identity = {
-                .orientation = {.x = 0, .y = 0, .z = 0, .w = 1.0},
-                .position = {.x = 0, .y = 0, .z = 0},
-	};
+	static constexpr XrQuaternionf IdentityQuat = {0, 0, 0, 1};
+	static constexpr XrVector3f IdentityVec = {0, 0, 0};
+	static constexpr XrPosef IdentityPose = { IdentityQuat, IdentityVec };
 
 	// Set by setupSpaces()
+	XrSpace BasePlaySpace = XR_NULL_HANDLE;
 	XrSpace PlaySpace = XR_NULL_HANDLE;
-	XrPosef PlaySpaceOffset = Identity;
+	XrPosef PlaySpaceOffset = IdentityPose;
 	float YawOffset = 0.0f;
 	XrSpace ViewSpace = XR_NULL_HANDLE;
 	bool DoRecenter = false;
@@ -109,7 +108,7 @@ protected:
 	float ZFar = 20000.f;
 
 	struct ViewChainData {
-		// Initialized by setupSwapchains
+		// Initialized by setupViewChains
                 unique_ptr<IOpenXRSwapchain> Swapchain;
                 unique_ptr<IOpenXRSwapchain> DepthSwapchain;
 
@@ -128,6 +127,16 @@ protected:
 	};
 	std::vector<ViewChainData> ViewChains;
 
+	// HUD Swapchain
+	struct HudChainData {
+		unique_ptr<IOpenXRSwapchain> Swapchain;
+		unique_ptr<IOpenXRSwapchain> DepthSwapchain;
+		std::vector<video::IRenderTarget*> RenderTargets;
+	};
+	HudChainData HudChain;
+	uint32_t HudWidth = 1280;
+	uint32_t HudHeight = 1024;
+
 	// Initialized by setupCompositionLayers
 	std::vector<XrCompositionLayerProjectionView> ViewLayers;
 
@@ -139,6 +148,8 @@ protected:
 	// ----------------------------------------------
 	// These are only valid when InFrame is true
 	bool InFrame = false;
+	core::XrFrameConfig FrameConfig; // provided by the app
+	bool RenderHud;
 	uint32_t NextViewIndex = 0;
 	XrFrameState FrameState;
 	XrViewState ViewState;
@@ -160,7 +171,8 @@ bool COpenXRSession::init()
 	if (!createSession()) return false;
 	// TODO: Initialize hand tracking
 	if (!setupSpaces()) return false;
-	if (!setupSwapchains()) return false;
+	if (!setupViewChains()) return false;
+	if (!setupHudChain()) return false;
 	if (!setupCompositionLayers()) return false;
 	// TODO: Setup actions
 	return true;
@@ -424,6 +436,15 @@ bool COpenXRSession::createSession()
 
 bool COpenXRSession::setupSpaces()
 {
+	if (BasePlaySpace == XR_NULL_HANDLE) {
+		XrReferenceSpaceCreateInfo createInfo = {
+			.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
+			.referenceSpaceType = PlaySpaceType,
+			.poseInReferenceSpace = IdentityPose,
+		};
+		XR_CHECK(xrCreateReferenceSpace, Session, &createInfo, &BasePlaySpace);
+	}
+
 	XR_ASSERT(PlaySpace == XR_NULL_HANDLE);
 	XrReferenceSpaceCreateInfo createInfo = {
 		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -436,7 +457,7 @@ bool COpenXRSession::setupSpaces()
 	XrReferenceSpaceCreateInfo viewCreateInfo = {
 		.type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
 		.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW,
-		.poseInReferenceSpace = Identity,
+		.poseInReferenceSpace = IdentityPose,
 	};
 	XR_CHECK(xrCreateReferenceSpace, Session, &viewCreateInfo, &ViewSpace);
 	return true;
@@ -447,7 +468,7 @@ bool COpenXRSession::recenterPlaySpace(XrTime ref)
 	XrSpaceLocation location = {
 		.type = XR_TYPE_SPACE_LOCATION,
 	};
-	XR_CHECK(xrLocateSpace, ViewSpace, PlaySpace, ref, &location);
+	XR_CHECK(xrLocateSpace, ViewSpace, BasePlaySpace, ref, &location);
 	bool validPosition = location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT;
 	bool validOrientation = location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
 
@@ -459,8 +480,8 @@ bool COpenXRSession::recenterPlaySpace(XrTime ref)
 	// that the XZ plane is parallel with the floor.
 	XrVector3f forward = quatApply(location.pose.orientation, XrVector3f{0, 0, 1});
 	float yaw = atan2f(forward.x, forward.z);
-	YawOffset = fmodf(YawOffset + yaw, 2 * M_PI);
-	PlaySpaceOffset.orientation = XrQuaternionf{0, sinf(YawOffset/2), 0, cosf(YawOffset/2)};
+	PlaySpaceOffset.position = location.pose.position;
+	PlaySpaceOffset.orientation = XrQuaternionf{0, sinf(yaw/2), 0, cosf(yaw/2)};
 	xrDestroySpace(PlaySpace);
 	PlaySpace = XR_NULL_HANDLE;
 	xrDestroySpace(ViewSpace);
@@ -507,7 +528,22 @@ bool COpenXRSession::waitFrame()
 	return true;
 }
 
-bool COpenXRSession::setupSwapchains()
+void COpenXRSession::resetViewChains()
+{
+	// Clean up view swapchains
+	for (auto& viewChain : ViewChains) {
+		for (auto& target : viewChain.RenderTargets) {
+			if (target) {
+				VideoDriver->removeRenderTarget(target);
+				target = nullptr;
+			}
+		}
+		viewChain.Swapchain.reset();
+		viewChain.DepthSwapchain.reset();
+	}
+}
+
+bool COpenXRSession::setupViewChains()
 {
 	uint32_t count;
 	XR_CHECK(xrEnumerateSwapchainFormats, Session, 0, &count, NULL);
@@ -580,9 +616,48 @@ bool COpenXRSession::setupSwapchains()
 		// These are added as needed
 		viewChain.RenderTargets.resize(swapchainLength, nullptr);
 	}
+	return true;
+}
 
-	// Fill in layers
+void COpenXRSession::resetHudChain()
+{
+	for (auto& target : HudChain.RenderTargets) {
+		if (target) {
+			VideoDriver->removeRenderTarget(target);
+			target = nullptr;
+		}
+	}
+	HudChain.Swapchain.reset();
+	HudChain.DepthSwapchain.reset();
+}
 
+bool COpenXRSession::setupHudChain()
+{
+	// Setup HUD
+	HudChain.Swapchain = createOpenXRSwapchain(
+		VideoDriver,
+		Instance,
+		Session,
+		XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT,
+		ColorFormat,
+		1,
+		HudWidth,
+		HudHeight);
+	if (!HudChain.Swapchain)
+		return false;
+	HudChain.DepthSwapchain = createOpenXRSwapchain(
+		VideoDriver,
+		Instance,
+		Session,
+		XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		DepthFormat,
+		1,
+		HudWidth,
+		HudHeight);
+	if (!HudChain.DepthSwapchain)
+		return false;
+	size_t swapchainLength = HudChain.Swapchain->getLength();
+	HudChain.RenderTargets.resize(swapchainLength, nullptr);
 	return true;
 }
 
@@ -649,7 +724,7 @@ void COpenXRSession::recenter()
 	DoRecenter = true;
 }
 
-bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_time_delta)
+bool COpenXRSession::internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config)
 {
 	XR_ASSERT(!InFrame);
 	// App should not send us frames except in between startXR() and stopXR()
@@ -669,6 +744,20 @@ bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_ti
 	XR_ASSERT(Running);
 	XR_ASSERT(DidWaitFrame);
 
+	FrameConfig = config;
+	RenderHud = FrameConfig.FloatingHud.Enable;
+
+	// If the hud changed size, remake the swapchain
+	if (RenderHud && (
+		FrameConfig.HudSize.Width != HudWidth ||
+		FrameConfig.HudSize.Height != HudHeight)) {
+		resetHudChain();
+		HudWidth = FrameConfig.HudSize.Width;
+		HudHeight = FrameConfig.HudSize.Height;
+		if (!setupHudChain())
+			return false;
+	}
+
 	XrFrameBeginInfo beginInfo = {
 		.type = XR_TYPE_FRAME_BEGIN_INFO,
 	};
@@ -683,10 +772,6 @@ bool COpenXRSession::internalTryBeginFrame(bool *didBegin, int64_t *predicted_ti
 			return false;
 		}
 	}
-
-
-	// TODO: Calculate
-	*predicted_time_delta = 0;
 
 	// TODO: Do hand tracking calculations need to happen in between waiting and beginning the frame?
 	// And xrLocateViews, xrSyncActions, xrGetActionStatePose, xrLocateSpace, xrGetActionStateFloat, xrApplyHapticFeedback, etc
@@ -732,6 +817,7 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 {
 	XR_ASSERT(InFrame);
 	if (FrameState.shouldRender == XR_TRUE) {
+		// TODO(paradust): Unify and clean up
 		if (NextViewIndex < ViewChains.size()) {
 			uint32_t viewIndex = NextViewIndex++;
 			auto& viewChain = ViewChains[viewIndex];
@@ -770,6 +856,38 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 			return true;
 		}
 
+		// HUD
+		if (RenderHud && NextViewIndex == ViewChains.size()) {
+			++NextViewIndex;
+			if (!HudChain.Swapchain->acquireAndWait())
+				return false;
+			if (!HudChain.DepthSwapchain->acquireAndWait())
+				return false;
+			auto& target = HudChain.RenderTargets[HudChain.Swapchain->getAcquiredIndex()];
+			if (!target) {
+				os::Printer::log("[XR] Adding render target", ELL_INFORMATION);
+				target = VideoDriver->addRenderTarget();
+			}
+			target->setTexture(
+				HudChain.Swapchain->getAcquiredTexture(),
+				HudChain.DepthSwapchain->getAcquiredTexture());
+			info->Kind = core::XRVK_HUD;
+			info->Target = target;
+			info->Width = HudWidth;
+			info->Height = HudHeight;
+			info->Position = core::vector3df(0, 0, 0);
+			info->Orientation = core::quaternion(0, 0, 0, 1);
+			// These should really not be used
+			info->AngleLeft = -45.0f;
+			info->AngleRight = 45.0f;
+			info->AngleUp = 45.0f;
+			info->AngleDown = -45.0f;
+			info->ZNear = 1.0f;
+			info->ZFar = 10.0f;
+			*gotView = true;
+			return true;
+		}
+
 		// If we're here, we're about to end frame. So release all the swapchains.
 		for (uint32_t viewIndex = 0; viewIndex < ViewChains.size(); ++viewIndex) {
 			auto& viewChain = ViewChains[viewIndex];
@@ -778,6 +896,12 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 			if (!viewChain.Swapchain->release())
 				return false;
 			if (!viewChain.DepthSwapchain->release())
+				return false;
+		}
+		if (RenderHud) {
+			if (!HudChain.Swapchain->release())
+				return false;
+			if (!HudChain.DepthSwapchain->release())
 				return false;
 		}
 
@@ -828,20 +952,45 @@ bool COpenXRSession::handleStateChange(XrEventDataSessionStateChanged *ev)
 bool COpenXRSession::endFrame()
 {
 	XR_ASSERT(InFrame);
-	XrCompositionLayerProjection projectionLayer = {
-		.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
-		.next = NULL,
-		.layerFlags = 0,
-		.space = PlaySpace,
-		.viewCount = (uint32_t)ViewLayers.size(),
-		.views = ViewLayers.data(),
-	};
-
 	uint32_t layerCount = 0;
 	const XrCompositionLayerBaseHeader* layers[5];
+	XrCompositionLayerProjection projectionLayer;
+	XrCompositionLayerQuad hudLayer;
 	if (FrameState.shouldRender) {
+		projectionLayer = XrCompositionLayerProjection{
+			.type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+			.next = NULL,
+			.layerFlags = 0,
+			.space = PlaySpace,
+			.viewCount = (uint32_t)ViewLayers.size(),
+			.views = ViewLayers.data(),
+		};
 		layers[layerCount++] = (XrCompositionLayerBaseHeader*)&projectionLayer;
 	}
+
+	if (FrameState.shouldRender && RenderHud) {
+		hudLayer = XrCompositionLayerQuad{
+			.type = XR_TYPE_COMPOSITION_LAYER_QUAD,
+			.layerFlags =
+				XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+				XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT,
+			.space = PlaySpace,
+			.eyeVisibility = XR_EYE_VISIBILITY_BOTH,
+			.pose = {
+				.orientation = irrlicht_to_xr(FrameConfig.FloatingHud.Orientation),
+				.position = irrlicht_to_xr(FrameConfig.FloatingHud.Position),
+			},
+			.size = irrlicht_to_xr(FrameConfig.FloatingHud.Size),
+		};
+		hudLayer.subImage.swapchain = HudChain.Swapchain->getHandle();
+		hudLayer.subImage.imageArrayIndex = 0;
+		hudLayer.subImage.imageRect.offset.x = 0;
+		hudLayer.subImage.imageRect.offset.y = 0;
+		hudLayer.subImage.imageRect.extent.width = HudWidth;
+		hudLayer.subImage.imageRect.extent.height = HudHeight;
+		layers[layerCount++] = (XrCompositionLayerBaseHeader*)&hudLayer;
+	}
+
 	XrFrameEndInfo frameEndInfo = {
 		.type = XR_TYPE_FRAME_END_INFO,
 		.next = NULL,

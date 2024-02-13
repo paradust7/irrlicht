@@ -2,6 +2,7 @@
 
 #include "quaternion.h"
 #include "vector3d.h"
+#include "dimension2d.h"
 #include "IRenderTarget.h"
 
 namespace irr
@@ -9,13 +10,24 @@ namespace irr
 namespace core
 {
 
+struct XrFrameConfig {
+	core::dimension2du HudSize;
+	struct {
+		bool Enable;
+		dimension2df Size;
+		// Coordinates of the center (in the XR fixed frame)
+		vector3df Position;
+		quaternion Orientation;
+	} FloatingHud;
+};
+
 enum XR_VIEW_KIND {
 	XRVK_INVALID,
 	XRVK_LEFT_EYE,
 	XRVK_RIGHT_EYE,
+	XRVK_HUD,
 	XRVK_GENERIC,
 };
-
 
 struct XrViewInfo {
 	XR_VIEW_KIND Kind;

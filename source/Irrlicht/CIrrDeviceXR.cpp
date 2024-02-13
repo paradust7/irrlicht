@@ -71,11 +71,10 @@ void CIrrDeviceXR::startXR()
 	Connector->startXR();
 }
 
-bool CIrrDeviceXR::beginFrame()
+bool CIrrDeviceXR::beginFrame(const core::XrFrameConfig& config)
 {
 	Connector->handleEvents();
-	int64_t delta;
-	if (!Connector->tryBeginFrame(&delta)) {
+	if (!Connector->tryBeginFrame(config)) {
 		return false;
 	}
 	return true;

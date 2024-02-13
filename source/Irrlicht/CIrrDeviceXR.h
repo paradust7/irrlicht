@@ -47,10 +47,9 @@ namespace irr
                 bool hasXR() const override;
 		void recenterXR() override;
                 void startXR() override;
-                bool beginFrame() override;
+                bool beginFrame(const core::XrFrameConfig& config) override;
                 bool nextView(core::XrViewInfo* info) override;
                 void stopXR() override;
-
 
 	protected:
 		std::unique_ptr<IOpenXRConnector> Connector;

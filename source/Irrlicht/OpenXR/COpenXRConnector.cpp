@@ -24,7 +24,7 @@ class COpenXRConnector : public IOpenXRConnector {
 		virtual void stopXR() override;
 		virtual void handleEvents() override;
 		virtual void recenter() override;
-		virtual bool tryBeginFrame(int64_t *predicted_time_delta) override;
+		virtual bool tryBeginFrame(const core::XrFrameConfig& config) override;
 		virtual bool nextView(core::XrViewInfo* info) override;
 	protected:
 		video::IVideoDriver* VideoDriver;
@@ -115,12 +115,12 @@ void COpenXRConnector::recenter()
 		Instance->recenter();
 }
 
-bool COpenXRConnector::tryBeginFrame(int64_t *predicted_time_delta)
+bool COpenXRConnector::tryBeginFrame(const core::XrFrameConfig& config)
 {
 	if (!Instance)
 		return false;
 	bool didBegin = false;
-	if (!Instance->internalTryBeginFrame(&didBegin, predicted_time_delta)) {
+	if (!Instance->internalTryBeginFrame(&didBegin, config)) {
 		invalidateInstance();
 		return false;
 	}

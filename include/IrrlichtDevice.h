@@ -348,7 +348,7 @@ namespace irr
 		//! Try to start a frame.
 		//! If the frame should be skipped, returns false.
 		//! This will block until the frame is ready to be drawn.
-		virtual bool beginFrame() = 0;
+		virtual bool beginFrame(const core::XrFrameConfig& config) = 0;
 
 		//! Get the next view to render
 		//! Returns false when all views are finished, and the frame is over.

@@ -1,6 +1,35 @@
 #pragma once
 
 #include "OpenXRHeaders.h"
+#include "quaternion.h"
+#include "vector3d.h"
+
+XrQuaternionf irrlicht_to_xr(const irr::core::quaternion& q)
+{
+	XrQuaternionf result;
+	result.x = q.X;
+	result.y = q.Y;
+	result.z = -q.Z;
+	result.w = q.W;
+	return result;
+}
+
+XrVector3f irrlicht_to_xr(const irr::core::vector3df& v)
+{
+	XrVector3f result;
+	result.x = v.X;
+	result.y = v.Y;
+	result.z = -v.Z;
+	return result;
+}
+
+XrExtent2Df irrlicht_to_xr(const irr::core::dimension2df& v)
+{
+	XrExtent2Df result;
+	result.width = v.Width;
+	result.height = v.Height;
+	return result;
+}
 
 // Multiply quaternions
 static inline XrQuaternionf quatMul(const XrQuaternionf& a, const XrQuaternionf& b)

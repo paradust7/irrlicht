@@ -70,7 +70,7 @@ public:
 	// HandleEvents() should continue to be called every frame. If the system
 	// comes back online, it will re-initialize, and TryBeginFrame() will return
 	// true again.
-	virtual bool tryBeginFrame(int64_t *predicted_time_delta) = 0;
+	virtual bool tryBeginFrame(const core::XrFrameConfig& config) = 0;
 
 	// Once a frame has begun, call NextView repeatedly until it returns false.
 	//

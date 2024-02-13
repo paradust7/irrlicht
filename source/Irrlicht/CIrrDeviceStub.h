@@ -162,7 +162,7 @@ namespace irr
 		bool hasXR() const override { return false; }
 		void recenterXR() override {}
 		void startXR() override {}
-		bool beginFrame() override { return false; }
+		bool beginFrame(const core::XrFrameConfig&) override { return false; }
 		bool nextView(core::XrViewInfo* info) override { return false; }
 		void stopXR() override {}
 
