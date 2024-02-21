@@ -185,6 +185,7 @@ endif()
 
 if(ENABLE_OPENGL)
 	add_definitions(-D_IRR_COMPILE_WITH_OPENGL_)
+	set(OPENGL_DIRECT_LINK TRUE) # not yet possible to remove this
 	if(DEVICE STREQUAL "WINDOWS")
 		add_definitions(-D_IRR_COMPILE_WITH_WGL_MANAGER_ -D_IRR_OPENGL_USE_EXTPOINTER_)
 	elseif(DEVICE STREQUAL "X11")
@@ -200,6 +201,7 @@ if(ENABLE_OPENGL3)
 	if (NOT USE_SDL2)
 		message(FATAL_ERROR "OpenGL 3 driver requires SDL2")
 	endif()
+	set(OPENGL_DIRECT_LINK TRUE) # TODO
 	set(USE_SDLGL ON)
 	set(USE_SDLGL3 ON)
 endif()
@@ -209,6 +211,7 @@ if(ENABLE_GLES1)
 		message(FATAL_ERROR "OpenGL ES 1 is not supported with SDL2")
 	endif()
 	add_definitions(-D_IRR_COMPILE_WITH_OGLES1_)
+	set(OPENGLES_DIRECT_LINK TRUE)
 	if(DEVICE MATCHES "^(WINDOWS|X11|ANDROID)$")
 		add_definitions(-D_IRR_COMPILE_WITH_EGL_MANAGER_ -D_IRR_OGLES1_USE_EXTPOINTER_)
 	endif()
@@ -216,9 +219,11 @@ endif()
 
 if(ENABLE_GLES2)
 	add_definitions(-D_IRR_COMPILE_WITH_OGLES2_)
+	set(OPENGLES2_DIRECT_LINK TRUE) # not yet possible to remove this
 	if(DEVICE MATCHES "^(WINDOWS|X11|ANDROID)$" OR EMSCRIPTEN)
 		add_definitions(-D_IRR_COMPILE_WITH_EGL_MANAGER_ -D_IRR_OGLES2_USE_EXTPOINTER_)
 	elseif(DEVICE STREQUAL "SDL")
+		add_definitions(-D_IRR_OGLES2_USE_EXTPOINTER_)
 		set(USE_SDLGL ON)
 		set(USE_SDLGLES2 ON)
 	endif()
@@ -276,7 +281,7 @@ if(ENABLE_OPENGL OR ENABLE_OPENGL3)
 	find_package(OpenGL REQUIRED)
 endif()
 if(USE_SDL2)
-	find_package(SDL2 CONFIG REQUIRED)
+	find_package(SDL2 2.0.10 CONFIG REQUIRED)
 	message(STATUS "Found SDL2: ${SDL2_LIBRARIES}")
 endif()
 
@@ -338,29 +343,6 @@ set(link_includes
 	"$<$<BOOL:${USE_X11}>:${X11_INCLUDE_DIR}>"
 
 	"${OPENXR_EXTRA_INCLUDE}"
-)
-
-set(link_libs
-	"${ZLIB_LIBRARY}"
-	"${JPEG_LIBRARY}"
-	"${PNG_LIBRARY}"
-	"$<$<BOOL:${USE_SDL2}>:${SDL2_LIBRARIES}>"
-
-	${OPENGL_LIBRARIES}
-	${OPENGLES_LIBRARY}
-	${OPENGLES2_LIBRARIES}
-	${EGL_LIBRARY}
-	OpenXR::headers
-	OpenXR::openxr_loader
-	${OPENXR_EXTRA_LIBS}
-
-	"$<$<PLATFORM_ID:Android>:-landroid -llog>"
-	${COCOA_LIB}
-	${IOKIT_LIB}
-	"$<$<PLATFORM_ID:Windows>:gdi32>"
-	"$<$<PLATFORM_ID:Windows>:winmm>"
-	"$<$<BOOL:${USE_X11}>:${X11_X11_LIB}>"
-	"$<$<BOOL:${USE_X11}>:${X11_Xi_LIB}>"
 )
 
 # Source files
@@ -573,7 +555,30 @@ target_include_directories(IrrlichtMt
 		${link_includes}
 )
 
-target_link_libraries(IrrlichtMt PRIVATE ${link_libs})
+# this needs to be here and not in a variable (like link_includes) due to issues
+# with the generator expressions on at least CMake 3.22, but not 3.28 or later
+target_link_libraries(IrrlichtMt PRIVATE
+	${ZLIB_LIBRARY}
+	${JPEG_LIBRARY}
+	${PNG_LIBRARY}
+	"$<$<BOOL:${USE_SDL2}>:${SDL2_LIBRARIES}>"
+
+	"$<$<BOOL:${OPENGL_DIRECT_LINK}>:${OPENGL_LIBRARIES}>"
+	"$<$<BOOL:${OPENGLES_DIRECT_LINK}>:${OPENGLES_LIBRARY}>"
+	"$<$<BOOL:${OPENGLES2_DIRECT_LINK}>:${OPENGLES2_LIBRARIES}>"
+	${EGL_LIBRARY}
+	OpenXR::headers
+	OpenXR::openxr_loader
+	${OPENXR_EXTRA_LIBS}
+
+	"$<$<PLATFORM_ID:Android>:-landroid -llog>"
+	${COCOA_LIB}
+	${IOKIT_LIB}
+	"$<$<PLATFORM_ID:Windows>:gdi32>"
+	"$<$<PLATFORM_ID:Windows>:winmm>"
+	"$<$<BOOL:${USE_X11}>:${X11_X11_LIB}>"
+	"$<$<BOOL:${USE_X11}>:${X11_Xi_LIB}>"
+)
 
 if(WIN32)
 	target_compile_definitions(IrrlichtMt INTERFACE _IRR_WINDOWS_API_) # used in _IRR_DEBUG_BREAK_IF definition in a public header

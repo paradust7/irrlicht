@@ -159,9 +159,9 @@ COGLES2Driver::~COGLES2Driver()
 		io::IReadFile* vsFile = FileSystem->createAndOpenFile(vsPath);
 		if ( !vsFile )
 		{
-			core::stringw warning(L"Warning: Missing shader files needed to simulate fixed function materials:\n");
-			warning += core::stringw(vsPath) + L"\n";
-			warning += L"Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
+			std::string warning("Warning: Missing shader files needed to simulate fixed function materials:\n");
+			warning.append(vsPath.c_str()).append("\n");
+			warning += "The path can be changed in SIrrCreationParamters::OGLES2ShaderPath";
 			os::Printer::log(warning.c_str(), ELL_WARNING);
 			return;
 		}
@@ -169,9 +169,9 @@ COGLES2Driver::~COGLES2Driver()
 		io::IReadFile* fsFile = FileSystem->createAndOpenFile(fsPath);
 		if ( !fsFile )
 		{
-			core::stringw warning(L"Warning: Missing shader files needed to simulate fixed function materials:\n");
-			warning += core::stringw(fsPath) + L"\n";
-			warning += L"Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
+			std::string warning("Warning: Missing shader files needed to simulate fixed function materials:\n");
+			warning.append(fsPath.c_str()).append("\n");
+			warning += "The path can be changed in SIrrCreationParamters::OGLES2ShaderPath";
 			os::Printer::log(warning.c_str(), ELL_WARNING);
 			return;
 		}
@@ -1858,7 +1858,7 @@ COGLES2Driver::~COGLES2Driver()
 
 
 	//! \return Returns the name of the video driver.
-	const wchar_t* COGLES2Driver::getName() const
+	const char* COGLES2Driver::getName() const
 	{
 		return Name.c_str();
 	}
@@ -2533,92 +2533,6 @@ COGLES2Driver::~COGLES2Driver()
 			}
 			pixelType = GL_UNSIGNED_BYTE;
 			break;
-#ifdef GL_EXT_texture_compression_s3tc
-		case ECF_DXT1:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-			break;
-#endif
-#ifdef GL_EXT_texture_compression_s3tc
-		case ECF_DXT2:
-		case ECF_DXT3:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-			break;
-#endif
-#ifdef GL_EXT_texture_compression_s3tc
-		case ECF_DXT4:
-		case ECF_DXT5:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-			break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-		case ECF_PVRTC_RGB2:
-			supported = true;
-			pixelFormat = GL_RGB;
-			pixelType = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
-			break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-		case ECF_PVRTC_ARGB2:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
-			break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-		case ECF_PVRTC_RGB4:
-			supported = true;
-			pixelFormat = GL_RGB;
-			pixelType = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-			break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-		case ECF_PVRTC_ARGB4:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-			break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc2
-		case ECF_PVRTC2_ARGB2:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
-			break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc2
-		case ECF_PVRTC2_ARGB4:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
-			break;
-#endif
-#ifdef GL_OES_compressed_ETC1_RGB8_texture
-		case ECF_ETC1:
-			supported = true;
-			pixelFormat = GL_RGB;
-			pixelType = GL_ETC1_RGB8_OES;
-			break;
-#endif
-#ifdef GL_ES_VERSION_3_0 // TO-DO - fix when extension name will be available
-		case ECF_ETC2_RGB:
-			supported = true;
-			pixelFormat = GL_RGB;
-			pixelType = GL_COMPRESSED_RGB8_ETC2;
-			break;
-#endif
-#ifdef GL_ES_VERSION_3_0 // TO-DO - fix when extension name will be available
-		case ECF_ETC2_ARGB:
-			supported = true;
-			pixelFormat = GL_RGBA;
-			pixelType = GL_COMPRESSED_RGBA8_ETC2_EAC;
-			break;
-#endif
 		case ECF_D16:
 			supported = true;
 			pixelFormat = GL_DEPTH_COMPONENT;

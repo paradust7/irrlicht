@@ -125,8 +125,6 @@ bool COGLES1Driver::genericDriverInit(const core::dimension2d<u32>& screenSize, 
 
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_FASTEST);
 	glHint(GL_GENERATE_MIPMAP_HINT, GL_FASTEST);
-	glHint(GL_LINE_SMOOTH_HINT, GL_FASTEST);
-	glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
 	glDepthFunc(GL_LEQUAL);
 	glFrontFace(GL_CW);
 	glAlphaFunc(GL_GREATER, 0.f);
@@ -1798,33 +1796,15 @@ void COGLES1Driver::setBasicRenderStates(const SMaterial& material, const SMater
 	// Anti aliasing
 	if (resetAllRenderStates || lastmaterial.AntiAliasing != material.AntiAliasing)
 	{
-//		if (FeatureAvailable[IRR_ARB_multisample])
-		{
-			if (material.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
-				glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-			else if (lastmaterial.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
-				glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		if (material.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
+			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		else if (lastmaterial.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 
-			if ((AntiAlias >= 2) && (material.AntiAliasing & (EAAM_SIMPLE|EAAM_QUALITY)))
-				glEnable(GL_MULTISAMPLE);
-			else
-				glDisable(GL_MULTISAMPLE);
-		}
-		if ((material.AntiAliasing & EAAM_LINE_SMOOTH) != (lastmaterial.AntiAliasing & EAAM_LINE_SMOOTH))
-		{
-			if (material.AntiAliasing & EAAM_LINE_SMOOTH)
-				glEnable(GL_LINE_SMOOTH);
-			else if (lastmaterial.AntiAliasing & EAAM_LINE_SMOOTH)
-				glDisable(GL_LINE_SMOOTH);
-		}
-		if ((material.AntiAliasing & EAAM_POINT_SMOOTH) != (lastmaterial.AntiAliasing & EAAM_POINT_SMOOTH))
-		{
-			if (material.AntiAliasing & EAAM_POINT_SMOOTH)
-				// often in software, and thus very slow
-				glEnable(GL_POINT_SMOOTH);
-			else if (lastmaterial.AntiAliasing & EAAM_POINT_SMOOTH)
-				glDisable(GL_POINT_SMOOTH);
-		}
+		if ((AntiAlias >= 2) && (material.AntiAliasing & (EAAM_SIMPLE|EAAM_QUALITY)))
+			glEnable(GL_MULTISAMPLE);
+		else
+			glDisable(GL_MULTISAMPLE);
 	}
 
 	// Texture parameters
@@ -1872,33 +1852,7 @@ void COGLES1Driver::setTextureRenderStates(const SMaterial& material, bool reset
 		if (resetAllRenderstates)
 			statesCache.IsCached = false;
 
-#ifdef GL_VERSION_2_1
-		if (Version >= 210)
-		{
-			if (!statesCache.IsCached || material.TextureLayers[i].LODBias != statesCache.LODBias)
-			{
-				if (material.TextureLayers[i].LODBias)
-				{
-					const float tmp = core::clamp(material.TextureLayers[i].LODBias * 0.125f, -MaxTextureLODBias, MaxTextureLODBias);
-					glTexParameterf(tmpTextureType, GL_TEXTURE_LOD_BIAS, tmp);
-				}
-				else
-					glTexParameterf(tmpTextureType, GL_TEXTURE_LOD_BIAS, 0.f);
-
-				statesCache.LODBias = material.TextureLayers[i].LODBias;
-			}
-		}
-		else if (FeatureAvailable[IRR_EXT_texture_lod_bias])
-		{
-			if (material.TextureLayers[i].LODBias)
-			{
-				const float tmp = core::clamp(material.TextureLayers[i].LODBias * 0.125f, -MaxTextureLODBias, MaxTextureLODBias);
-				glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, tmp);
-			}
-			else
-				glTexEnvf(GL_TEXTURE_FILTER_CONTROL_EXT, GL_TEXTURE_LOD_BIAS_EXT, 0.f);
-		}
-#elif defined(GL_EXT_texture_lod_bias)
+#if defined(GL_EXT_texture_lod_bias)
 		if (FeatureAvailable[COGLESCoreExtensionHandler::IRR_GL_EXT_texture_lod_bias])
 		{
 			if (material.TextureLayers[i].LODBias)
@@ -2087,7 +2041,7 @@ void COGLES1Driver::setRenderStates2DMode(bool alpha, bool texture, bool alphaCh
 
 
 //! \return Returns the name of the video driver.
-const wchar_t* COGLES1Driver::getName() const
+const char* COGLES1Driver::getName() const
 {
 	return Name.c_str();
 }
@@ -2888,104 +2842,6 @@ bool COGLES1Driver::getColorFormatParameters(ECOLOR_FORMAT format, GLint& intern
 		}
 		pixelType = GL_UNSIGNED_BYTE;
 		break;
-#ifdef GL_EXT_texture_compression_s3tc
-	case ECF_DXT1:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-		break;
-#endif
-#ifdef GL_EXT_texture_compression_s3tc
-	case ECF_DXT2:
-	case ECF_DXT3:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-		break;
-#endif
-#ifdef GL_EXT_texture_compression_s3tc
-	case ECF_DXT4:
-	case ECF_DXT5:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-		break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-	case ECF_PVRTC_RGB2:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
-		pixelFormat = GL_RGB;
-		pixelType = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
-		break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-	case ECF_PVRTC_ARGB2:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
-		break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-	case ECF_PVRTC_RGB4:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-		pixelFormat = GL_RGB;
-		pixelType = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-		break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc
-	case ECF_PVRTC_ARGB4:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-		break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc2
-	case ECF_PVRTC2_ARGB2:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
-		break;
-#endif
-#ifdef GL_IMG_texture_compression_pvrtc2
-	case ECF_PVRTC2_ARGB4:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
-		break;
-#endif
-#ifdef GL_OES_compressed_ETC1_RGB8_texture
-	case ECF_ETC1:
-		supported = true;
-		internalFormat = GL_ETC1_RGB8_OES;
-		pixelFormat = GL_RGB;
-		pixelType = GL_ETC1_RGB8_OES;
-		break;
-#endif
-#ifdef GL_ES_VERSION_3_0 // TO-DO - fix when extension name will be available
-	case ECF_ETC2_RGB:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGB8_ETC2;
-		pixelFormat = GL_RGB;
-		pixelType = GL_COMPRESSED_RGB8_ETC2;
-		break;
-#endif
-#ifdef GL_ES_VERSION_3_0 // TO-DO - fix when extension name will be available
-	case ECF_ETC2_ARGB:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA8_ETC2_EAC;
-		pixelFormat = GL_RGBA;
-		pixelType = GL_COMPRESSED_RGBA8_ETC2_EAC;
-		break;
-#endif
 	case ECF_D16:
 		supported = true;
 		internalFormat = GL_DEPTH_COMPONENT16;

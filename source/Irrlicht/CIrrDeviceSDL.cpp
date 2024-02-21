@@ -193,7 +193,18 @@ bool CIrrDeviceSDL::keyIsKnownSpecial(EKEY_CODE key)
 	}
 }
 
-int CIrrDeviceSDL::findCharToPassToIrrlicht(int assumedChar, EKEY_CODE key) {
+int CIrrDeviceSDL::findCharToPassToIrrlicht(int assumedChar, EKEY_CODE key)
+{
+	// special cases that always return a char regardless of how the SDL keycode
+	// looks
+	switch (key) {
+		case KEY_RETURN:
+		case KEY_ESCAPE:
+			return (int)key;
+		default:
+			break;
+	}
+
 	// SDL in-place ORs values with no character representation with 1<<30
 	// https://wiki.libsdl.org/SDL2/SDLKeycodeLookup
 	if (assumedChar & (1<<30))
@@ -218,9 +229,28 @@ int CIrrDeviceSDL::findCharToPassToIrrlicht(int assumedChar, EKEY_CODE key) {
 void CIrrDeviceSDL::resetReceiveTextInputEvents() {
 	gui::IGUIElement *elem = GUIEnvironment->getFocus();
 	if (elem && elem->acceptsIME())
-		SDL_StartTextInput();
+	{
+		// IBus seems to have an issue where dead keys and compose keys do not
+		// work (specifically, the individual characters in the sequence are
+		// sent as text input events instead of the result) when
+		// SDL_StartTextInput() is called on the same input box.
+		core::rect<s32> pos = elem->getAbsolutePosition();
+		if (!SDL_IsTextInputActive() || lastElemPos != pos)
+		{
+			lastElemPos = pos;
+			SDL_Rect rect;
+			rect.x = pos.UpperLeftCorner.X;
+			rect.y = pos.UpperLeftCorner.Y;
+			rect.w = pos.getWidth();
+			rect.h = pos.getHeight();
+			SDL_SetTextInputRect(&rect);
+			SDL_StartTextInput();
+		}
+	}
 	else
+	{
 		SDL_StopTextInput();
+	}
 }
 
 //! constructor
@@ -229,7 +259,7 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 	Window((SDL_Window*)param.WindowId), SDL_Flags(0),
 	MouseX(0), MouseY(0), MouseXRel(0), MouseYRel(0), MouseButtonStates(0),
 	Width(param.WindowSize.Width), Height(param.WindowSize.Height),
-	Resizable(param.WindowResizable == 1 ? true : false)
+	Resizable(param.WindowResizable == 1 ? true : false), CurrentTouchCount(0)
 {
 	#ifdef _DEBUG
 	setDebugName("CIrrDeviceSDL");
@@ -254,14 +284,21 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters& param)
 		}
 	}
 
+	// Minetest has its own code to synthesize mouse events from touch events,
+	// so we prevent SDL from doing it.
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+
 	// create keymap
 	createKeyMap();
 
 	// create window
 	if (CreationParams.DriverType != video::EDT_NULL)
 	{
-		// create the window, only if we do not use the null device
-		createWindow();
+		if (!createWindow()) {
+			Close = true;
+			return;
+		}
 	}
 
 
@@ -698,18 +735,13 @@ bool CIrrDeviceSDL::run()
 				else
 					key = (EKEY_CODE)KeyMap[idx].Win32Key;
 
+				if (key == (EKEY_CODE)0)
+					os::Printer::log("keycode not mapped", core::stringc(mp.SDLKey), ELL_DEBUG);
+
 				// Make sure to only input special characters if something is in focus, as SDL_TEXTINPUT handles normal unicode already
 				if (SDL_IsTextInputActive() && !keyIsKnownSpecial(key) && (SDL_event.key.keysym.mod & KMOD_CTRL) == 0)
 					break;
 
-#ifdef _IRR_WINDOWS_API_
-				// handle alt+f4 in Windows, because SDL seems not to
-				if ( (SDL_event.key.keysym.mod & KMOD_LALT) && key == KEY_F4)
-				{
-					Close = true;
-					break;
-				}
-#endif
 				irrevent.EventType = irr::EET_KEY_INPUT_EVENT;
 				irrevent.KeyInput.Key = key;
 				irrevent.KeyInput.PressedDown = (SDL_event.type == SDL_KEYDOWN);
@@ -742,6 +774,45 @@ bool CIrrDeviceSDL::run()
 			irrevent.EventType = irr::EET_USER_EVENT;
 			irrevent.UserEvent.UserData1 = reinterpret_cast<uintptr_t>(SDL_event.user.data1);
 			irrevent.UserEvent.UserData2 = reinterpret_cast<uintptr_t>(SDL_event.user.data2);
+
+			postEventFromUser(irrevent);
+			break;
+
+		case SDL_FINGERDOWN:
+			irrevent.EventType = EET_TOUCH_INPUT_EVENT;
+			irrevent.TouchInput.Event = ETIE_PRESSED_DOWN;
+			irrevent.TouchInput.ID = SDL_event.tfinger.fingerId;
+			irrevent.TouchInput.X = SDL_event.tfinger.x * Width;
+			irrevent.TouchInput.Y = SDL_event.tfinger.y * Height;
+			CurrentTouchCount++;
+			irrevent.TouchInput.touchedCount = CurrentTouchCount;
+
+			postEventFromUser(irrevent);
+			break;
+
+		case SDL_FINGERMOTION:
+			irrevent.EventType = EET_TOUCH_INPUT_EVENT;
+			irrevent.TouchInput.Event = ETIE_MOVED;
+			irrevent.TouchInput.ID = SDL_event.tfinger.fingerId;
+			irrevent.TouchInput.X = SDL_event.tfinger.x * Width;
+			irrevent.TouchInput.Y = SDL_event.tfinger.y * Height;
+			irrevent.TouchInput.touchedCount = CurrentTouchCount;
+
+			postEventFromUser(irrevent);
+			break;
+
+		case SDL_FINGERUP:
+			irrevent.EventType = EET_TOUCH_INPUT_EVENT;
+			irrevent.TouchInput.Event = ETIE_LEFT_UP;
+			irrevent.TouchInput.ID = SDL_event.tfinger.fingerId;
+			irrevent.TouchInput.X = SDL_event.tfinger.x * Width;
+			irrevent.TouchInput.Y = SDL_event.tfinger.y * Height;
+			// To match Android behavior, still count the pointer that was
+			// just released.
+			irrevent.TouchInput.touchedCount = CurrentTouchCount;
+			if (CurrentTouchCount > 0) {
+				CurrentTouchCount--;
+			}
 
 			postEventFromUser(irrevent);
 			break;
@@ -1205,7 +1276,7 @@ void CIrrDeviceSDL::createKeyMap()
 	KeyMap.push_back(SKeyMap(SDLK_KP_9, KEY_NUMPAD9));
 	KeyMap.push_back(SKeyMap(SDLK_KP_MULTIPLY, KEY_MULTIPLY));
 	KeyMap.push_back(SKeyMap(SDLK_KP_PLUS, KEY_ADD));
-//	KeyMap.push_back(SKeyMap(SDLK_KP_, KEY_SEPARATOR));
+	KeyMap.push_back(SKeyMap(SDLK_KP_ENTER, KEY_RETURN));
 	KeyMap.push_back(SKeyMap(SDLK_KP_MINUS, KEY_SUBTRACT));
 	KeyMap.push_back(SKeyMap(SDLK_KP_PERIOD, KEY_DECIMAL));
 	KeyMap.push_back(SKeyMap(SDLK_KP_DIVIDE, KEY_DIVIDE));

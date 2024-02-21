@@ -844,9 +844,9 @@ const SColorf& CNullDriver::getAmbientLight() const
 //! \return Returns the name of the video driver. Example: In case of the DIRECT3D8
 //! driver, it would return "Direct3D8".
 
-const wchar_t* CNullDriver::getName() const
+const char* CNullDriver::getName() const
 {
-	return L"Irrlicht NullDevice";
+	return "Irrlicht NullDevice";
 }
 
 
@@ -1006,68 +1006,6 @@ bool CNullDriver::checkPrimitiveCount(u32 prmCount) const
 
 bool CNullDriver::checkImage(IImage *image) const
 {
-	ECOLOR_FORMAT format = image->getColorFormat();
-	core::dimension2d<u32> size = image->getDimension();
-
-	switch (format)
-	{
-	case ECF_DXT1:
-	case ECF_DXT2:
-	case ECF_DXT3:
-	case ECF_DXT4:
-	case ECF_DXT5:
-		if (!queryFeature(EVDF_TEXTURE_COMPRESSED_DXT))
-		{
-			os::Printer::log("DXT texture compression not available.", ELL_ERROR);
-			return false;
-		}
-		else if (size.getOptimalSize(true, false) != size)
-		{
-			os::Printer::log("Invalid size of image for DXT texture, size of image must be power of two.", ELL_ERROR);
-			return false;
-		}
-		break;
-	case ECF_PVRTC_RGB2:
-	case ECF_PVRTC_ARGB2:
-	case ECF_PVRTC_RGB4:
-	case ECF_PVRTC_ARGB4:
-		if (!queryFeature(EVDF_TEXTURE_COMPRESSED_PVRTC))
-		{
-			os::Printer::log("PVRTC texture compression not available.", ELL_ERROR);
-			return false;
-		}
-		else if (size.getOptimalSize(true, false) != size)
-		{
-			os::Printer::log("Invalid size of image for PVRTC compressed texture, size of image must be power of two and squared.", ELL_ERROR);
-			return false;
-		}
-		break;
-	case ECF_PVRTC2_ARGB2:
-	case ECF_PVRTC2_ARGB4:
-		if (!queryFeature(EVDF_TEXTURE_COMPRESSED_PVRTC2))
-		{
-			os::Printer::log("PVRTC2 texture compression not available.", ELL_ERROR);
-			return false;
-		}
-		break;
-	case ECF_ETC1:
-		if (!queryFeature(EVDF_TEXTURE_COMPRESSED_ETC1))
-		{
-			os::Printer::log("ETC1 texture compression not available.", ELL_ERROR);
-			return false;
-		}
-		break;
-	case ECF_ETC2_RGB:
-	case ECF_ETC2_ARGB:
-		if (!queryFeature(EVDF_TEXTURE_COMPRESSED_ETC2))
-		{
-			os::Printer::log("ETC2 texture compression not available.", ELL_ERROR);
-			return false;
-		}
-		break;
-	default:
-		break;
-	}
 	return true;
 }
 
@@ -1996,7 +1934,7 @@ IImage* CNullDriver::createScreenShot(video::ECOLOR_FORMAT format, video::E_REND
 // prints renderer version
 void CNullDriver::printVersion()
 {
-	core::stringw namePrint = L"Using renderer: ";
+	core::stringc namePrint = "Using renderer: ";
 	namePrint += getName();
 	os::Printer::log(namePrint.c_str(), ELL_INFORMATION);
 }

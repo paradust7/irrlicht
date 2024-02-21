@@ -290,9 +290,9 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 		io::IReadFile* vsFile = FileSystem->createAndOpenFile(vsPath);
 		if ( !vsFile )
 		{
-			core::stringw warning(L"Warning: Missing shader files needed to simulate fixed function materials:\n");
-			warning += core::stringw(vsPath) + L"\n";
-			warning += L"Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
+			std::string warning("Warning: Missing shader files needed to simulate fixed function materials:\n");
+			warning.append(vsPath.c_str()).append("\n");
+			warning += "Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
 			os::Printer::log(warning.c_str(), ELL_WARNING);
 			return;
 		}
@@ -300,9 +300,9 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 		io::IReadFile* fsFile = FileSystem->createAndOpenFile(fsPath);
 		if ( !fsFile )
 		{
-			core::stringw warning(L"Warning: Missing shader files needed to simulate fixed function materials:\n");
-			warning += core::stringw(fsPath) + L"\n";
-			warning += L"Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
+			std::string warning("Warning: Missing shader files needed to simulate fixed function materials:\n");
+			warning.append(fsPath.c_str()).append("\n");
+			warning += "Shaderpath can be changed in SIrrCreationParamters::OGLES2ShaderPath";
 			os::Printer::log(warning.c_str(), ELL_WARNING);
 			return;
 		}
@@ -313,6 +313,10 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 			*vertexShaderData = new c8[size+1];
 			vsFile->read(*vertexShaderData, size);
 			(*vertexShaderData)[size] = 0;
+		}
+		{
+			auto tmp = std::string("Loaded ") + std::to_string(size) + " bytes for vertex shader " + vertexShaderName.c_str();
+			os::Printer::log(tmp.c_str(), ELL_INFORMATION);
 		}
 
 		size = fsFile->getSize();
@@ -325,6 +329,10 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 			*fragmentShaderData = new c8[size+1];
 			fsFile->read(*fragmentShaderData, size);
 			(*fragmentShaderData)[size] = 0;
+		}
+		{
+			auto tmp = std::string("Loaded ") + std::to_string(size) + " bytes for fragment shader " + fragmentShaderName.c_str();
+			os::Printer::log(tmp.c_str(), ELL_INFORMATION);
 		}
 
 		vsFile->drop();
@@ -478,10 +486,12 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 		{
 			HWBuffer->vbo_verticesSize = bufferSize;
 
-			if (HWBuffer->Mapped_Vertex == scene::EHM_STATIC)
-				GL.BufferData(GL_ARRAY_BUFFER, bufferSize, buffer, GL_STATIC_DRAW);
-			else
-				GL.BufferData(GL_ARRAY_BUFFER, bufferSize, buffer, GL_DYNAMIC_DRAW);
+			GLenum usage = GL_STATIC_DRAW;
+			if (HWBuffer->Mapped_Index == scene::EHM_STREAM)
+				usage = GL_STREAM_DRAW;
+			else if (HWBuffer->Mapped_Index == scene::EHM_DYNAMIC)
+				usage = GL_DYNAMIC_DRAW;
+			GL.BufferData(GL_ARRAY_BUFFER, bufferSize, buffer, usage);
 		}
 
 		GL.BindBuffer(GL_ARRAY_BUFFER, 0);
@@ -541,10 +551,12 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 		{
 			HWBuffer->vbo_indicesSize = indexCount * indexSize;
 
-			if (HWBuffer->Mapped_Index == scene::EHM_STATIC)
-				GL.BufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * indexSize, indices, GL_STATIC_DRAW);
-			else
-				GL.BufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * indexSize, indices, GL_DYNAMIC_DRAW);
+			GLenum usage = GL_STATIC_DRAW;
+			if (HWBuffer->Mapped_Index == scene::EHM_STREAM)
+				usage = GL_STREAM_DRAW;
+			else if (HWBuffer->Mapped_Index == scene::EHM_DYNAMIC)
+				usage = GL_DYNAMIC_DRAW;
+			GL.BufferData(GL_ELEMENT_ARRAY_BUFFER, indexCount * indexSize, indices, usage);
 		}
 
 		GL.BindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -1611,7 +1623,7 @@ COpenGL3DriverBase::~COpenGL3DriverBase()
 
 
 	//! \return Returns the name of the video driver.
-	const wchar_t* COpenGL3DriverBase::getName() const
+	const char* COpenGL3DriverBase::getName() const
 	{
 		return Name.c_str();
 	}

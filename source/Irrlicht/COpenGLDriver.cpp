@@ -90,9 +90,9 @@ bool COpenGLDriver::genericDriverInit()
 	if (ContextManager)
 		ContextManager->grab();
 
-	Name=L"OpenGL ";
+	Name="OpenGL ";
 	Name.append(glGetString(GL_VERSION));
-	s32 pos=Name.findNext(L' ', 7);
+	s32 pos=Name.findNext(' ', 7);
 	if (pos != -1)
 		Name=Name.subString(0, pos);
 	printVersion();
@@ -171,8 +171,6 @@ bool COpenGLDriver::genericDriverInit()
 
 	glClearDepth(1.0);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
-	glHint(GL_POINT_SMOOTH_HINT, GL_FASTEST);
 	glFrontFace(GL_CW);
 	// adjust flat coloring scheme to DirectX version
 #if defined(GL_ARB_provoking_vertex) || defined(GL_EXT_provoking_vertex)
@@ -2567,46 +2565,29 @@ void COpenGLDriver::setBasicRenderStates(const SMaterial& material, const SMater
 	}
 
 	// Anti aliasing
-	if (resetAllRenderStates || lastmaterial.AntiAliasing != material.AntiAliasing)
-	{
-		if (FeatureAvailable[IRR_ARB_multisample])
-		{
-			if (material.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
-				glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
-			else if (lastmaterial.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
-				glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
+	if ((resetAllRenderStates
+			|| lastmaterial.AntiAliasing != material.AntiAliasing)
+			&& FeatureAvailable[IRR_ARB_multisample]) {
+		if (material.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
+			glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
+		else if (lastmaterial.AntiAliasing & EAAM_ALPHA_TO_COVERAGE)
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
 
-			if ((AntiAlias >= 2) && (material.AntiAliasing & (EAAM_SIMPLE|EAAM_QUALITY)))
-			{
-				glEnable(GL_MULTISAMPLE_ARB);
+		if ((AntiAlias >= 2) && (material.AntiAliasing & (EAAM_SIMPLE|EAAM_QUALITY)))
+		{
+			glEnable(GL_MULTISAMPLE_ARB);
 #ifdef GL_NV_multisample_filter_hint
-				if (FeatureAvailable[IRR_NV_multisample_filter_hint])
-				{
-					if ((material.AntiAliasing & EAAM_QUALITY) == EAAM_QUALITY)
-						glHint(GL_MULTISAMPLE_FILTER_HINT_NV, GL_NICEST);
-					else
-						glHint(GL_MULTISAMPLE_FILTER_HINT_NV, GL_FASTEST);
-				}
-#endif
+			if (FeatureAvailable[IRR_NV_multisample_filter_hint])
+			{
+				if ((material.AntiAliasing & EAAM_QUALITY) == EAAM_QUALITY)
+					glHint(GL_MULTISAMPLE_FILTER_HINT_NV, GL_NICEST);
+				else
+					glHint(GL_MULTISAMPLE_FILTER_HINT_NV, GL_FASTEST);
 			}
-			else
-				glDisable(GL_MULTISAMPLE_ARB);
+#endif
 		}
-		if ((material.AntiAliasing & EAAM_LINE_SMOOTH) != (lastmaterial.AntiAliasing & EAAM_LINE_SMOOTH))
-		{
-			if (material.AntiAliasing & EAAM_LINE_SMOOTH)
-				glEnable(GL_LINE_SMOOTH);
-			else if (lastmaterial.AntiAliasing & EAAM_LINE_SMOOTH)
-				glDisable(GL_LINE_SMOOTH);
-		}
-		if ((material.AntiAliasing & EAAM_POINT_SMOOTH) != (lastmaterial.AntiAliasing & EAAM_POINT_SMOOTH))
-		{
-			if (material.AntiAliasing & EAAM_POINT_SMOOTH)
-				// often in software, and thus very slow
-				glEnable(GL_POINT_SMOOTH);
-			else if (lastmaterial.AntiAliasing & EAAM_POINT_SMOOTH)
-				glDisable(GL_POINT_SMOOTH);
-		}
+		else
+			glDisable(GL_MULTISAMPLE_ARB);
 	}
 
 	// Texture parameters
@@ -2949,7 +2930,7 @@ void COpenGLDriver::setRenderStates2DMode(bool alpha, bool texture, bool alphaCh
 
 
 //! \return Returns the name of the video driver.
-const wchar_t* COpenGLDriver::getName() const
+const char* COpenGLDriver::getName() const
 {
 	return Name.c_str();
 }
@@ -3971,29 +3952,6 @@ bool COpenGLDriver::getColorFormatParameters(ECOLOR_FORMAT format, GLint& intern
 		pixelFormat = GL_BGRA_EXT;
 		if (Version > 101)
 			pixelType = GL_UNSIGNED_INT_8_8_8_8_REV;
-		break;
-	case ECF_DXT1:
-		if (queryOpenGLFeature(COpenGLExtensionHandler::IRR_EXT_texture_compression_s3tc))
-		{
-			supported = true;
-			internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-			pixelFormat = GL_BGRA_EXT;
-			pixelType = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-		}
-		break;
-	case ECF_DXT2:
-	case ECF_DXT3:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-		pixelFormat = GL_BGRA_EXT;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-		break;
-	case ECF_DXT4:
-	case ECF_DXT5:
-		supported = true;
-		internalFormat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-		pixelFormat = GL_BGRA_EXT;
-		pixelType = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 		break;
 	case ECF_D16:
 		supported = true;
