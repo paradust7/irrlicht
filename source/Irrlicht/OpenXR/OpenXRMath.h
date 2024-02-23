@@ -4,6 +4,11 @@
 #include "quaternion.h"
 #include "vector3d.h"
 
+irr::core::vector3df xr_to_irrlicht(const XrVector3f& pos)
+{
+	return irr::core::vector3df(pos.x, pos.y, -pos.z);
+}
+
 XrQuaternionf irrlicht_to_xr(const irr::core::quaternion& q)
 {
 	XrQuaternionf result;
@@ -68,6 +73,16 @@ static inline XrVector3f quatApply(const XrQuaternionf& a, const XrVector3f &b)
 		.x = r.x,
 		.y = r.y,
 		.z = r.z,
+	};
+	return result;
+}
+
+static inline XrVector3f vecScale(float k, const XrVector3f& a)
+{
+	XrVector3f result = {
+		.x = k * a.x,
+		.y = k * a.y,
+		.z = k * a.z,
 	};
 	return result;
 }

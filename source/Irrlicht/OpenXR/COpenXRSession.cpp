@@ -153,6 +153,7 @@ protected:
 	uint32_t NextViewIndex = 0;
 	XrFrameState FrameState;
 	XrViewState ViewState;
+	XrVector3f ViewCenter;
 	std::vector<XrView> ViewInfo;
 	// ----------------------------------------------
 
@@ -809,6 +810,14 @@ bool COpenXRSession::internalTryBeginFrame(bool *didBegin, const core::XrFrameCo
 			ViewLayers[i].pose = ViewInfo[i].pose;
 			ViewLayers[i].fov = ViewInfo[i].fov;
 		}
+		// Compute eye center
+		if (viewCount == 0) {
+			ViewCenter = {0, 0, 0};
+		} else if (viewCount == 1) {
+			ViewCenter = ViewInfo[0].pose.position;
+		} else {
+			ViewCenter = vecScale(0.5, vecAdd(ViewInfo[0].pose.position, ViewInfo[1].pose.position));
+		}
 	}
 	return true;
 }
@@ -842,8 +851,9 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 			info->Target = target;
 			info->Width = viewConfig.recommendedImageRectWidth;
 			info->Height = viewConfig.recommendedImageRectHeight;
+			info->PositionBase = xr_to_irrlicht(ViewCenter);
 			// RH -> LH coordinates
-			info->Position = core::vector3df(position.x, position.y, -position.z);
+			info->Position = xr_to_irrlicht(position);
 			// RH -> LH coordinates + invert
 			info->Orientation = core::quaternion(-orientation.x, -orientation.y, orientation.z, orientation.w);
 			info->AngleLeft = fov.angleLeft;
@@ -875,6 +885,7 @@ bool COpenXRSession::internalNextView(bool *gotView, core::XrViewInfo* info)
 			info->Target = target;
 			info->Width = HudWidth;
 			info->Height = HudHeight;
+			info->PositionBase = core::vector3df(0, 0, 0);
 			info->Position = core::vector3df(0, 0, 0);
 			info->Orientation = core::quaternion(0, 0, 0, 1);
 			// These should really not be used

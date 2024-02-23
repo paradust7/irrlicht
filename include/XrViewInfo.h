@@ -41,6 +41,10 @@ struct XrViewInfo {
 	core::vector3df Position;
 	core::quaternion Orientation;
 
+	// If this is an eye (left/right), this is the center point between
+	// the two eyes. Used for IPD adjustment.
+	core::vector3df PositionBase;
+
 	// FoV angles (in radians)
 	// For symmetric FoV, left/down will be negative
 	// Total angles are (angleRight - angleLeft) and (angleUp - angleDown)
