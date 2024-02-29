@@ -4,6 +4,7 @@
 #include "IOpenXRConnector.h"
 #include "IOpenXRSession.h"
 #include "IOpenXRSwapchain.h"
+#include "IOpenXRInput.h"
 #include "Common.h"
 #include "OpenXRMath.h"
 
@@ -27,6 +28,7 @@ public:
 	}
 	virtual ~COpenXRSession() {
 		// Order is important!
+		Input.reset();
 		ViewLayers.clear();
 		resetViewChains();
 		resetHudChain();
@@ -43,6 +45,7 @@ public:
 
 	virtual bool setAppReady(bool ready) override;
 	virtual void recenter() override;
+	virtual void getInputState(core::XrInputState* state) override;
 	virtual bool internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config) override;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
 	virtual bool handleStateChange(XrEventDataSessionStateChanged *ev) override;
@@ -58,6 +61,7 @@ protected:
 	bool setupViewChains();
 	bool setupHudChain();
 	bool setupCompositionLayers();
+	bool setupInput();
 
 	void resetViewChains();
 	void resetHudChain();
@@ -82,14 +86,12 @@ protected:
 
 	XrSession Session = XR_NULL_HANDLE;
 
+	unique_ptr<IOpenXRInput> Input;
+
 	// Parameters for the view config we're using
 	// For stereo, this has left and right eyes
 	XrViewConfigurationType ViewType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 	std::vector<XrViewConfigurationView> ViewConfigs;
-
-	static constexpr XrQuaternionf IdentityQuat = {0, 0, 0, 1};
-	static constexpr XrVector3f IdentityVec = {0, 0, 0};
-	static constexpr XrPosef IdentityPose = { IdentityQuat, IdentityVec };
 
 	// Set by setupSpaces()
 	XrSpace BasePlaySpace = XR_NULL_HANDLE;
@@ -175,7 +177,7 @@ bool COpenXRSession::init()
 	if (!setupViewChains()) return false;
 	if (!setupHudChain()) return false;
 	if (!setupCompositionLayers()) return false;
-	// TODO: Setup actions
+	if (!setupInput()) return false;
 	return true;
 }
 
@@ -703,6 +705,14 @@ bool COpenXRSession::setupCompositionLayers()
 	return true;
 }
 
+bool COpenXRSession::setupInput()
+{
+	Input = createOpenXRInput(Instance, Session);
+	if (!Input)
+		return false;
+	return true;
+}
+
 bool COpenXRSession::setAppReady(bool ready)
 {
 	XR_ASSERT(!InFrame);
@@ -723,6 +733,11 @@ bool COpenXRSession::setAppReady(bool ready)
 void COpenXRSession::recenter()
 {
 	DoRecenter = true;
+}
+
+void COpenXRSession::getInputState(core::XrInputState* state)
+{
+	Input->getInputState(state);
 }
 
 bool COpenXRSession::internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config)
@@ -1028,8 +1043,10 @@ unique_ptr<IOpenXRSession> createOpenXRSession(
 	XrReferenceSpaceType playSpaceType)
 {
 	unique_ptr<COpenXRSession> obj(new COpenXRSession(instance, driver, playSpaceType));
-	if (!obj->init())
+	if (!obj->init()) {
+		os::Printer::log("[XR] createOpenXRSession failed", ELL_ERROR);
 		return nullptr;
+	}
 	return obj;
 }
 

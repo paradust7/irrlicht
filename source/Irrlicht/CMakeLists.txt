@@ -478,6 +478,7 @@ endif()
 if(ENABLE_OPENXR)
 	target_sources(IRROTHEROBJ PRIVATE
 		OpenXR/COpenXRConnector.cpp
+		OpenXR/COpenXRInput.cpp
 		OpenXR/COpenXRInstance.cpp
 		OpenXR/COpenXRSession.cpp
 		OpenXR/COpenXRSwapchain.cpp

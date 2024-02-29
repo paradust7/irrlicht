@@ -4,12 +4,21 @@
 #include "quaternion.h"
 #include "vector3d.h"
 
-irr::core::vector3df xr_to_irrlicht(const XrVector3f& pos)
+static constexpr XrQuaternionf IdentityQuat = {0, 0, 0, 1};
+static constexpr XrVector3f IdentityVec = {0, 0, 0};
+static constexpr XrPosef IdentityPose = { IdentityQuat, IdentityVec };
+
+static inline irr::core::vector3df xr_to_irrlicht(const XrVector3f& pos)
 {
 	return irr::core::vector3df(pos.x, pos.y, -pos.z);
 }
 
-XrQuaternionf irrlicht_to_xr(const irr::core::quaternion& q)
+static inline irr::core::quaternion xr_to_irrlicht(const XrQuaternionf& q)
+{
+	return irr::core::quaternion(q.x, q.y, -q.z, q.w);
+}
+
+static inline XrQuaternionf irrlicht_to_xr(const irr::core::quaternion& q)
 {
 	XrQuaternionf result;
 	result.x = q.X;
@@ -19,7 +28,7 @@ XrQuaternionf irrlicht_to_xr(const irr::core::quaternion& q)
 	return result;
 }
 
-XrVector3f irrlicht_to_xr(const irr::core::vector3df& v)
+static inline XrVector3f irrlicht_to_xr(const irr::core::vector3df& v)
 {
 	XrVector3f result;
 	result.x = v.X;
@@ -28,7 +37,7 @@ XrVector3f irrlicht_to_xr(const irr::core::vector3df& v)
 	return result;
 }
 
-XrExtent2Df irrlicht_to_xr(const irr::core::dimension2df& v)
+static inline XrExtent2Df irrlicht_to_xr(const irr::core::dimension2df& v)
 {
 	XrExtent2Df result;
 	result.width = v.Width;

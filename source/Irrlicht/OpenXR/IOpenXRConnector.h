@@ -50,6 +50,8 @@ public:
 	// Schedule a recenter before the next frame.
 	virtual void recenter() = 0;
 
+	virtual void getInputState(core::XrInputState* state) = 0;
+
 	// tryBeginFrame
 	//
 	// Try to begin the next frame. This method blocks to achieve VSync with the

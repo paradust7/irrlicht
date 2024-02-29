@@ -17,6 +17,7 @@ public:
 	virtual void setAppReady(bool ready) = 0;
 	virtual bool handleEvents() = 0;
 	virtual void recenter() = 0;
+	virtual void getInputState(core::XrInputState* state) = 0;
 	virtual bool internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config) = 0;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) = 0;
 };

@@ -345,6 +345,11 @@ namespace irr
 		*/
 		virtual void recenterXR() = 0;
 
+		//! This can be called at any time, but it is only updated
+		//! once per frame. If the app is disconnected or unfocused
+		//! it will contain dummy data.
+		virtual void xrGetInputState(core::XrInputState* state) = 0;
+
 		//! Signal that the app is rendering XR
 		virtual void startXR() = 0;
 

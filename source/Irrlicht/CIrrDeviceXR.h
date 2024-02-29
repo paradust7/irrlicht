@@ -44,12 +44,13 @@ namespace irr
 		//! Is device motion available.
 		bool isDeviceMotionAvailable() override;
 
-                bool hasXR() const override;
+		bool hasXR() const override;
 		void recenterXR() override;
-                void startXR() override;
-                bool beginFrame(const core::XrFrameConfig& config) override;
-                bool nextView(core::XrViewInfo* info) override;
-                void stopXR() override;
+		void startXR() override;
+		void xrGetInputState(core::XrInputState* state) override;
+		bool beginFrame(const core::XrFrameConfig& config) override;
+		bool nextView(core::XrViewInfo* info) override;
+		void stopXR() override;
 
 	protected:
 		std::unique_ptr<IOpenXRConnector> Connector;

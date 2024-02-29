@@ -24,6 +24,7 @@ class COpenXRConnector : public IOpenXRConnector {
 		virtual void stopXR() override;
 		virtual void handleEvents() override;
 		virtual void recenter() override;
+		virtual void getInputState(core::XrInputState* state) override;
 		virtual bool tryBeginFrame(const core::XrFrameConfig& config) override;
 		virtual bool nextView(core::XrViewInfo* info) override;
 	protected:
@@ -113,6 +114,14 @@ void COpenXRConnector::recenter()
 {
 	if (Instance)
 		Instance->recenter();
+}
+
+void COpenXRConnector::getInputState(core::XrInputState* state)
+{
+	if (Instance)
+		Instance->getInputState(state);
+	else
+		memset(state, 0, sizeof(*state));
 }
 
 bool COpenXRConnector::tryBeginFrame(const core::XrFrameConfig& config)

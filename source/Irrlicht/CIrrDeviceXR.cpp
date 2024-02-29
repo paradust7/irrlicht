@@ -66,6 +66,11 @@ void CIrrDeviceXR::recenterXR()
 	Connector->recenter();
 }
 
+void CIrrDeviceXR::xrGetInputState(core::XrInputState* state)
+{
+	Connector->getInputState(state);
+}
+
 void CIrrDeviceXR::startXR()
 {
 	Connector->startXR();

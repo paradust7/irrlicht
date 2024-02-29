@@ -26,6 +26,7 @@ public:
 	virtual void setAppReady(bool ready) override;
 	virtual bool handleEvents() override;
 	virtual void recenter() override;
+	virtual void getInputState(core::XrInputState* state) override;
 	virtual bool internalTryBeginFrame(bool *didBegin, const core::XrFrameConfig& config) override;
 	virtual bool internalNextView(bool *gotView, core::XrViewInfo* info) override;
 protected:
@@ -229,6 +230,14 @@ void COpenXRInstance::recenter()
 {
 	if (Session)
 		Session->recenter();
+}
+
+void COpenXRInstance::getInputState(core::XrInputState* state)
+{
+	if (Session)
+		Session->getInputState(state);
+	else
+		memset(state, 0, sizeof(*state));
 }
 
 bool COpenXRInstance::tryCreateSession()

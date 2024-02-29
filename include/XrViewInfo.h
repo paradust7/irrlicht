@@ -10,6 +10,54 @@ namespace irr
 namespace core
 {
 
+enum XR_INPUT_HAND {
+	XRIH_LEFT = 0,
+	XRIH_RIGHT = 1,
+};
+
+struct XrButton {
+	bool Pressed; // button is pressed
+
+	// If the controller has capacitive sensors, this will indicate
+	// that the player's finger is on or very near the button
+	bool Touched;
+
+	// On a button with continuous trigger, this can be
+	// any value from 0.0 to 1.0 Otherwise, it will jump 0 to 1.
+	// Generally only the primary button has a trigger.
+	float Value;
+};
+
+struct XrPose {
+	// Position and Orientation are only meaningful if Valid is set
+	bool Valid;
+	vector3df Position;
+	quaternion Orientation;
+};
+
+struct XrInputHand {
+	// Aim position and direction
+	XrPose Aim;
+
+	// Where objects are gripped
+	XrPose Grip;
+
+	// Buttons
+	XrButton Attack;
+	XrButton Use;
+	XrButton Menu;
+
+	// Joystick
+	// TBD
+
+	// Touchpad
+	// TBD
+};
+
+struct XrInputState {
+	XrInputHand Hand[2];
+};
+
 struct XrFrameConfig {
 	core::dimension2du HudSize;
 	struct {
