@@ -132,6 +132,11 @@ class quaternion
 		//! Creates a matrix from this quaternion
 		inline void getMatrix_transposed( matrix4 &dest ) const;
 
+		quaternion inverse() const
+		{
+			return quaternion(-X, -Y, -Z, W);
+		}
+
 		//! Inverts this quaternion
 		quaternion& makeInverse();
 
@@ -764,3 +769,12 @@ inline core::quaternion& quaternion::rotationFromTo(const vector3df& from, const
 } // end namespace irr
 
 
+inline std::ostream& operator<<(std::ostream& os, const irr::core::quaternion &q)
+{
+	os << "quaternion("
+		<< q.X << ","
+		<< q.Y << ","
+		<< q.Z << ","
+		<< q.W << ")";
+	return os;
+}

@@ -37,10 +37,12 @@ public:
 		memset(&State, 0, sizeof(State));
 		if (!setupActions()) return false;
 		if (!setupBindings()) return false;
+		if (!attachSet()) return false;
 		return true;
 	}
 	bool setupActions();
 	bool setupBindings();
+	bool attachSet();
 
 	struct BindingRecord {
 		XrAction action;
@@ -56,10 +58,10 @@ public:
 		XrSpace baseSpace;
 	};
 
-	virtual bool updateState(XrTime predictedDisplayTime, XrSpace baseSpace) override;
+	virtual bool updateState(XrSessionState sessionState, XrTime predictedDisplayTime, XrSpace baseSpace) override;
 	virtual void getInputState(core::XrInputState* state) override;
 	bool updateHand(const UpdateInfo& updateInfo, XrPath handPath, core::XrInputHand* handState, int i);
-	bool updatePose(const UpdateInfo& updateInfo, XrPath handpath, core::XrPose* poseState, XrAction poseAction, XrSpace actionSpace);
+	bool updatePose(const UpdateInfo& updateInfo, XrPath handpath, core::XrInputPose* poseState, XrAction poseAction, XrSpace actionSpace);
 	bool updateButton(
 		const UpdateInfo& updateInfo,
 		XrPath handPath,
@@ -231,7 +233,18 @@ bool COpenXRInput::suggestBindings(
 	return true;
 }
 
-bool COpenXRInput::updateState(XrTime predictedDisplayTime, XrSpace baseSpace)
+bool COpenXRInput::attachSet()
+{
+	const XrSessionActionSetsAttachInfo attachInfo = {
+		.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
+		.countActionSets = 1,
+		.actionSets = &MainActionSet,
+	};
+	XR_CHECK(xrAttachSessionActionSets, Session, &attachInfo);
+	return true;
+}
+
+bool COpenXRInput::updateState(XrSessionState sessionState, XrTime predictedDisplayTime, XrSpace baseSpace)
 {
 	const XrActiveActionSet activeActionSets[] = {
 		{.actionSet = MainActionSet, .subactionPath = XR_NULL_PATH}
@@ -241,7 +254,15 @@ bool COpenXRInput::updateState(XrTime predictedDisplayTime, XrSpace baseSpace)
 		.countActiveActionSets = sizeof(activeActionSets)/sizeof(*activeActionSets),
 		.activeActionSets = activeActionSets,
 	};
-	XR_CHECK(xrSyncActions, Session, &syncInfo);
+	XrResult result = xrSyncActions(Session, &syncInfo);
+	if (result == XR_SESSION_NOT_FOCUSED) {
+		// This can happen if there's a delay receiving the session state update event.
+		memset(&State, 0, sizeof(State));
+		return true;
+	}
+	if (!check(result, "xrSyncActions"))
+		return false;
+
 	UpdateInfo updateInfo = {
 		.predictedDisplayTime = predictedDisplayTime,
 		.baseSpace = baseSpace,
@@ -274,7 +295,7 @@ bool COpenXRInput::updateHand(const UpdateInfo& updateInfo, XrPath handPath, cor
 	return true;
 }
 
-bool COpenXRInput::updatePose(const UpdateInfo& updateInfo, XrPath handPath, core::XrPose* poseState, XrAction poseAction, XrSpace actionSpace)
+bool COpenXRInput::updatePose(const UpdateInfo& updateInfo, XrPath handPath, core::XrInputPose* poseState, XrAction poseAction, XrSpace actionSpace)
 {
 	// xrGetActionStatePose only tells us whether there is an active device
 	XrActionStatePose actionPoseState = {
@@ -298,11 +319,9 @@ bool COpenXRInput::updatePose(const UpdateInfo& updateInfo, XrPath handPath, cor
 		(location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT);
 	poseState->Valid = valid;
 	if (valid) {
-		poseState->Position = xr_to_irrlicht(location.pose.position);
-		poseState->Orientation = xr_to_irrlicht(location.pose.orientation);
+		poseState->Pose = xr_to_irrlicht(location.pose);
 	} else {
-		poseState->Position = core::vector3df(0, 0, 0);
-		poseState->Orientation = core::quaternion(0, 0, 0, 1);
+		poseState->Pose = core::pose();
 	}
 	return true;
 }

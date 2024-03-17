@@ -2,6 +2,7 @@
 
 #include "quaternion.h"
 #include "vector3d.h"
+#include "pose.h"
 #include "dimension2d.h"
 #include "IRenderTarget.h"
 
@@ -28,19 +29,18 @@ struct XrButton {
 	float Value;
 };
 
-struct XrPose {
+struct XrInputPose {
 	// Position and Orientation are only meaningful if Valid is set
 	bool Valid;
-	vector3df Position;
-	quaternion Orientation;
+	pose Pose;
 };
 
 struct XrInputHand {
 	// Aim position and direction
-	XrPose Aim;
+	XrInputPose Aim;
 
 	// Where objects are gripped
-	XrPose Grip;
+	XrInputPose Grip;
 
 	// Buttons
 	XrButton Attack;

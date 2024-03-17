@@ -18,6 +18,13 @@ static inline irr::core::quaternion xr_to_irrlicht(const XrQuaternionf& q)
 	return irr::core::quaternion(q.x, q.y, -q.z, q.w);
 }
 
+static inline irr::core::pose xr_to_irrlicht(const XrPosef& pose)
+{
+	return irr::core::pose(
+		xr_to_irrlicht(pose.position),
+		xr_to_irrlicht(pose.orientation));
+}
+
 static inline XrQuaternionf irrlicht_to_xr(const irr::core::quaternion& q)
 {
 	XrQuaternionf result;

@@ -528,6 +528,10 @@ bool COpenXRSession::waitFrame()
 	};
 	XR_CHECK(xrWaitFrame, Session, &waitInfo, &FrameState);
 	DidWaitFrame = true;
+
+	if (!Input->updateState(SessionState, FrameState.predictedDisplayTime, PlaySpace))
+		return false;
+
 	return true;
 }
 

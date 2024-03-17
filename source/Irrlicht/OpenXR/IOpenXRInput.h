@@ -10,7 +10,7 @@ class IOpenXRInput {
 public:
 	virtual ~IOpenXRInput() {}
 
-	virtual bool updateState(XrTime predictedDisplayTime, XrSpace baseSpace) = 0;
+	virtual bool updateState(XrSessionState sessionState, XrTime predictedDisplayTime, XrSpace baseSpace) = 0;
 	virtual void getInputState(core::XrInputState* state) = 0;
 };
 
